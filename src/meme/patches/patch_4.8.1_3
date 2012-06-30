@@ -1,0 +1,2760 @@
+diff -r dd34c00ca339 -r 629ed6e19fbc scripts/metatest.pl.in
+--- a/scripts/metatest.pl.in	Wed Feb 08 13:58:31 2012 -0800
++++ b/scripts/metatest.pl.in	Thu Feb 09 09:34:58 2012 +1000
+@@ -304,7 +304,9 @@
+     print("Updating reference files.\n");
+     for (my $i = 0; $i < $comparison_count; $i++) {
+       $comparison = @{$comparisons}[$i];
+-      copy($comparison->{output}, $comparison->{reference});
++      my $output = $comparison->{output};
++      $output = $stdout_fn if ($output eq '-');
++      copy($output, $comparison->{reference});
+     }
+   }
+ CLEANUP:
+diff -r 59ed92581a34 -r b2c55b0470c4 src/alphtype.c
+--- a/src/alphtype.c	Tue Mar 06 09:43:43 2012 +1000
++++ b/src/alphtype.c	Thu Mar 08 16:12:32 2012 +1000
+@@ -29,7 +29,7 @@
+ #include "macros.h"
+ #include "hash_alph.h"
+ 
+-extern int main(
++int main(
+   int argc,
+   char **argv
+ )
+diff -r 59ed92581a34 -r b2c55b0470c4 src/background.c
+--- a/src/background.c	Tue Mar 06 09:43:43 2012 +1000
++++ b/src/background.c	Thu Mar 08 16:12:32 2012 +1000
+@@ -92,7 +92,7 @@
+ 
+ */
+ /***************************************************************************/
+-extern double *read_markov_model( 
++double *read_markov_model( 
+   char *pfile, 					/* name of probability file */
+   double *freq,					/* letter frequencies */
+   char *alpha,					/* alphabet expected */
+@@ -103,18 +103,20 @@
+ {
+   int i;					/* index into array */
+   double a_p[MAX_BACK_SIZE];			/* tuple-prob array */
+-  double *a_cp=NULL; 				/* conditional prob. array */
++  double *a_cp; 				/* conditional prob. array */
+   FILE *pfilep;					/* file pointer to file */
+-  char *line=NULL;				/* line buffer */
+-  char **fields=NULL;				/* fields of line */
++  char *line;				/* line buffer */
++  char **fields;				/* fields of line */
+   int nfields;					/* number of fields in line */
+-  int line_no=0;				/* line number */
++  int line_no = 0;				/* line number */
+   char *tuple;					/* the tuple */
+   double p;					/* the probability */
+-  int maxw=0;					/* maximum tuple width */
+-  int alen=strlen(alpha);			/* length of alphabet */
++  int maxw = 0;					/* maximum tuple width */
++  int alen = strlen(alpha);			/* length of alphabet */
+   int ntuples;					/* number of tuples */
+-
++  a_cp = NULL;
++  line = NULL;
++  fields = NULL;
+   /* check input */
+   if (!pfile && !freq) {
+     fprintf(stderr, "read_markov_model error: specify pfile or freq\n");
+@@ -141,6 +143,8 @@
+     if (add_x) a_cp[i] = 1.0;			/* Pr(X) */
+     /* average reverse complement probabilities together if requested */
+     if (rc) average_rc(add_x, a_cp, 1, "", 0, alpha); 
++    // cleanup before return
++    if (add_x) free(alpha);
+     return(a_cp);
+   }
+ 
+@@ -211,6 +215,9 @@
+   print_prob(a_cp, maxw, "", 0, alpha);
+ #endif
+ 
++  // cleanup before return
++  if (add_x) free(alpha);
++
+   return(a_cp);					/* return conditionals */
+ } /* read_markov_model */
+ 
+@@ -229,7 +236,7 @@
+         Warning this function modifies the seq parameter.
+ */
+ /***************************************************************************/
+-extern double *get_markov_from_sequence(
++double *get_markov_from_sequence(
+   char *seq,            // the raw ASCII sequence
+   const char *alpha,    // alphabet expected
+   BOOLEAN rc,           // average reverse complements if TRUE
+@@ -530,7 +537,7 @@
+ 
+ */
+ /***************************************************************************/
+-extern double log_cum_back(
++double log_cum_back(
+   char *seq,					/* the sequence */
+   double *a_cp,					/* the conditional probs */
+   int order,					/* the order of the model */
+@@ -605,7 +612,7 @@
+ 	Returns the index or -1 if the string contains illegal characters.
+ */
+ /***************************************************************************/
+-extern int s2i(
++int s2i(
+   char *string					/* the string to index */
+ )
+ {
+@@ -632,7 +639,7 @@
+ 	Return -1 if prefix to long or if it contains illegal characters.
+ */
+ /***************************************************************************/
+-extern int p2i(
++int p2i(
+   char *string,					/* the string to index */
+   int w						// length of prefix
+ )
+@@ -660,7 +667,7 @@
+ 	Returns the string.
+ */
+ /***************************************************************************/
+-extern char *i2s(
++char *i2s(
+   int index
+ )
+ {
+diff -r 59ed92581a34 -r b2c55b0470c4 src/banner.c
+--- a/src/banner.c	Tue Mar 06 09:43:43 2012 +1000
++++ b/src/banner.c	Thu Mar 08 16:12:32 2012 +1000
+@@ -24,7 +24,7 @@
+ #include "meme.h"
+ #include "projrel.h"
+ 
+-extern void banner(
++void banner(
+   char *program, /* name of program */
+   FILE *outfile  /* destination for output */
+ ) 
+diff -r 59ed92581a34 -r b2c55b0470c4 src/branching_search.c
+--- a/src/branching_search.c	Tue Mar 06 09:43:43 2012 +1000
++++ b/src/branching_search.c	Thu Mar 08 16:12:32 2012 +1000
+@@ -110,7 +110,7 @@
+  *    with the novel seeds
+  *
+  */
+-extern void branching_search (
++void branching_search (
+   BRANCH_PARAMS *branch_params, ///< The parameters controlling branching search
+   MODEL *model,      ///< The motif model (nascent)
+   DATASET *dataset,  ///< The dataset of sequences
+diff -r 59ed92581a34 -r b2c55b0470c4 src/calculate_p_y.c
+--- a/src/calculate_p_y.c	Tue Mar 06 09:43:43 2012 +1000
++++ b/src/calculate_p_y.c	Thu Mar 08 16:12:32 2012 +1000
+@@ -121,7 +121,7 @@
+  * of int pointers, lmotif, so that each pointer points to an array in lmap.
+  *
+  */
+-extern void create_lmotif (
++void create_lmotif (
+   char *seed_str,    ///< The seed as a string
+   int lmap[MAXALPH][MAXALPH], ///< Matrix representing a seq-to-theta mapping fn
+   int *lmotif[MAXSITE], ///< The resulting lmotif - OUT
+@@ -160,7 +160,7 @@
+  * Memory must be pre-allocated for theta_1.
+  *
+  */
+-extern void init_lmotif (
++void init_lmotif (
+   int w,             ///< width of site
+   char *res,         ///< Integer encoded letters of subsequence
+   int *theta_1[MAXSITE], ///< theta_1
+@@ -189,7 +189,7 @@
+  * substring search, although this approach has not yet been implemented.
+  *
+  */
+-extern void evaluate_seed_DP (
++void evaluate_seed_DP (
+   char *new_seed,    ///< The string representing the new seed object.
+   SEED_DIFFS *s_diffs, ///< An object representing the differences between the
+                      ///< seed of interest and the "previous" seed.
+@@ -300,7 +300,7 @@
+  * substring search, although this approach has not yet been implemented.
+  *
+  */
+-extern void next_pY_branching(
++void next_pY_branching(
+   int *lmotif_new[MAXSITE], ///< The lmotif corresponding to the new seed.
+   SEED_DIFFS *s_diffs, ///< The differences between the new and old seeds.
+   DATASET *dataset,  ///< The dataset of sequences. Contains the pY arrays.
+diff -r 59ed92581a34 -r b2c55b0470c4 src/discretize.c
+--- a/src/discretize.c	Tue Mar 06 09:43:43 2012 +1000
++++ b/src/discretize.c	Thu Mar 08 16:12:32 2012 +1000
+@@ -116,7 +116,7 @@
+ 	Set the z to 1/0 using list of sites (maxima).
+ */
+ /***********************************************************************/
+-extern void set_z (
++void set_z (
+   MODEL *model,					/* the model */
+   DATASET *dataset 				/* the dataset */
+ )
+@@ -243,7 +243,7 @@
+ 	Returns the optimum number of sites.
+ */
+ /***********************************************************************/
+-extern double discretize(
++double discretize(
+   MODEL *model,				/* the model */
+   DATASET *dataset			/* the dataset */
+ )
+diff -r 59ed92581a34 -r b2c55b0470c4 src/display.c
+--- a/src/display.c	Tue Mar 06 09:43:43 2012 +1000
++++ b/src/display.c	Thu Mar 08 16:12:32 2012 +1000
+@@ -306,7 +306,7 @@
+   Doesn't support negative datasets.
+ */
+ /**********************************************************************/
+-extern void record_results(
++void record_results(
+   DATASET *dataset,              /* the dataset IN */
+   MODEL *model,                  /* the model IN */
+   MOTIF_SUMMARY *motif_summaries /* summaries of final motifs IN */
+@@ -354,6 +354,10 @@
+       motif_summaries[imotif].pssm[i][j] = logodds(i, j);
+     }
+   }
++  // destroy logodds matrix
++  for (i = 0; i < w; i++) free(((LOGODDSB**)logodds)[i]);
++  free(logodds);
++
+   create_2array(motif_summaries[imotif].psfm, double, w + 1, alength + 1);
+   for (i = 0; i < w; i++) {
+     for (j = 0; j < alength; j++) {
+@@ -372,7 +376,7 @@
+   Print the results of EM
+ */
+ /**********************************************************************/
+-extern void print_results(
++void print_results(
+   DATASET *dataset,      /* the dataset IN */
+   DATASET *neg_dataset,  /* negative examples IN */
+   MODEL *model,          /* the model */
+@@ -381,6 +385,7 @@
+   FILE* outfile          /* file for text output IN */
+ )
+ {
++  char *regexp;
+   int i;
+   int max_w = model->max_w;     /* maximum width tried */
+   int nstrands = model->invcomp ? 2 : 1;  /* # of strands to use */
+@@ -528,6 +533,9 @@
+   print_log_odds(
+     model->imotif, dataset, w, FALSE, logodds, thresh, model->logev, outfile
+   );
++  // destroy logodds matrix
++  for (i = 0; i < w; i++) free(((LOGODDSB**)logodds)[i]);
++  free(logodds);
+ 
+   /* print the observed frequency matrix */
+   print_theta(
+@@ -552,7 +560,9 @@
+     fputc('-', outfile);
+   }
+   fputc('\n', outfile);
+-  fprintf(outfile, "%s\n", get_regexp(model, dataset, 0));
++  regexp = get_regexp(model, dataset, 0);
++  fprintf(outfile, "%s\n", regexp);
++  free(regexp);
+   for (i=0; i<PAGEWIDTH; i++) {
+     fputc('-', outfile);
+   }
+@@ -994,7 +1004,7 @@
+   Print the probability array.
+ */
+ /**********************************************************************/
+-extern void print_theta(
++void print_theta(
+   int imotif,   /* number of motif */
+   int format,   /* 1 = floating point
+                      2 = integer */
+@@ -1070,7 +1080,7 @@
+   print_zij
+ */
+ /**********************************************************************/
+-extern void print_zij(
++void print_zij(
+   DATASET *dataset,     /* the dataset */
+   MODEL *model        /* the model */
+ )
+@@ -1119,7 +1129,7 @@
+   print_wij
+ */
+ /**********************************************************************/
+-extern void print_wij(
++void print_wij(
+   DATASET *dataset      /* the dataset */
+ )
+ {
+@@ -1154,7 +1164,7 @@
+   written for the remaining letters.
+ */
+ /**********************************************************************/
+-extern char *get_consensus(
++char *get_consensus(
+   THETA theta,      /* motif theta */
+   int w,      /* width of motif */
+   DATASET *dataset,   /* the dataset */
+@@ -1241,6 +1251,7 @@
+   }
+   if (prosite==1) re[pos++] = '.';
+   re[pos++] = '\0';
++  free(pcons);
+ 
+   return re;
+ } /* get_regexp */
+@@ -1299,7 +1310,7 @@
+   print_dataset_summary
+ */
+ /**********************************************************************/
+-extern void print_dataset_summary (
++void print_dataset_summary (
+   DATASET *dataset, /* the dataset IN */
+   FILE *outfile     /* where to print IN */
+ )
+@@ -1385,7 +1396,7 @@
+   Print the command line summary
+ */
+ /**********************************************************************/
+-extern void print_command_summary(
++void print_command_summary(
+   MODEL *model,     /* the model IN */
+   DATASET *dataset, /* the dataset IN */
+   FILE *outfile     /* where to print IN */
+@@ -1816,7 +1827,7 @@
+   Print the summary of all the motifs.
+ */
+ /**********************************************************************/
+-extern void print_summary(
++void print_summary(
+   MODEL *model,     /* the model IN */
+   DATASET *dataset, /* the dataset IN */
+   LO **los,         /* the LO structures IN */
+@@ -1837,7 +1848,7 @@
+   Print MEME results in XML format. See DTD embeded in
+   meme-dtd.h for description of MEME document.
+  **********************************************************************/
+-extern void print_meme_file_xml(
++void print_meme_file_xml(
+   MODEL *model,                   /* the model IN */
+   DATASET *dataset,               /* the dataset IN */
+   LO *los[MAXG],                  /* logodds structures for motifs */
+@@ -2557,6 +2568,10 @@
+   /* print a final line of hyphens */
+   for (i=0; i<PAGEWIDTH; i++) fputc('-', outfile); fprintf(outfile, "\n\n");
+ 
++  // cleanup
++  free(hits);
++  free(pvalues);
++
+   myfree(seqlist);
+ 
+ } /* print_site_diagrams */
+diff -r 59ed92581a34 -r b2c55b0470c4 src/dpalign.c
+--- a/src/dpalign.c	Tue Mar 06 09:43:43 2012 +1000
++++ b/src/dpalign.c	Thu Mar 08 16:12:32 2012 +1000
+@@ -77,7 +77,7 @@
+ 
+ */
+ /******************************************************************************/
+-extern char *dp_align(
++char *dp_align(
+   int alength,					/* length of alphabet */
+   int n,					/* length of logodds matrix */
+   LOGODDS logodds,				/* logodds matrix */
+@@ -246,7 +246,7 @@
+ 	Returns and an array of sequences.    
+ */
+ /******************************************************************************/
+-extern char **dp_ma_motif_seqs(
++char **dp_ma_motif_seqs(
+   int alength,				/* length of sequence alphabet */
+   int w,				/* length of motif */
+   LOGODDS logodds,			/* motif log-odds matrix */
+@@ -368,7 +368,7 @@
+ 	off, the offset of the starting point of the g-alignment.
+ */
+ /******************************************************************************/
+-extern int g_align(
++int g_align(
+   char **ma,				/* the multiple alignment */
+   int nseq,				/* number of sequences in alignment 
+ 					   (including the key sequence) */
+@@ -454,7 +454,7 @@
+ 	Returns an array of null terminated, aligned sequences.
+ */
+ /******************************************************************************/
+-extern char **dp_multi_align(
++char **dp_multi_align(
+   P_PROB sites,					/* the sites */
+   int nsites,					/* the number of sites */
+   int w,					/* width of sites */
+diff -r 59ed92581a34 -r b2c55b0470c4 src/em.c
+--- a/src/em.c	Tue Mar 06 09:43:43 2012 +1000
++++ b/src/em.c	Thu Mar 08 16:12:32 2012 +1000
+@@ -43,7 +43,7 @@
+ 
+ */
+ /**********************************************************************/
+-extern void em(
++void em(
+   MODEL *model,			/* the model */
+   DATASET *dataset 		/* the dataset */
+ )
+diff -r 59ed92581a34 -r b2c55b0470c4 src/fitevd.c
+--- a/src/fitevd.c	Tue Mar 06 09:43:43 2012 +1000
++++ b/src/fitevd.c	Thu Mar 08 16:12:32 2012 +1000
+@@ -201,7 +201,7 @@
+   for use in computing the score distribution.
+ */
+ /**********************************************************************/
+-extern SCORE_SET *set_up_score_set(
++SCORE_SET *set_up_score_set(
+   PROB_T p_threshold,       // P-value threshold for motif hits.
+   PROB_T dp_threshold,      // Score threshold for DP.
+   int    max_gap,           // Maximum gap length to allow in matches.
+@@ -1440,7 +1440,7 @@
+   Returns n, the number of non-outliers.
+ */
+ /******************************************************************************/
+-extern int get_n(
++int get_n(
+   SCORE_SET score_set,      /* the set of scores and lens/gcs */
+   EVD_SET evd_set       // Distribution.
+ ) 
+@@ -1491,7 +1491,7 @@
+   See fitexp() and ml_evd() for meanings of parameters.
+ */
+ /******************************************************************************/
+-extern EVD_SET fit_score_distribution(
++EVD_SET fit_score_distribution(
+   BOOLEAN_T exponential,      // Fit exponential distribution?
+   SCORE_SET score_set,        /* the set of scores and lens */
+   double H,          /* initial estimate for H */
+diff -r 59ed92581a34 -r b2c55b0470c4 src/getsize.c
+--- a/src/getsize.c	Tue Mar 06 09:43:43 2012 +1000
++++ b/src/getsize.c	Thu Mar 08 16:12:32 2012 +1000
+@@ -38,7 +38,7 @@
+ */
+ /**********************************************************************/
+ 
+-extern int main(
++int main(
+   int argc,
+   char *argv[]
+ )
+diff -r 59ed92581a34 -r b2c55b0470c4 src/hash_alph.c
+--- a/src/hash_alph.c	Tue Mar 06 09:43:43 2012 +1000
++++ b/src/hash_alph.c	Thu Mar 08 16:12:32 2012 +1000
+@@ -50,7 +50,7 @@
+ 	the BLAST alphabet are hashed to 'X'.
+ */
+ /**********************************************************************/
+-extern int setup_hash_alph(
++int setup_hash_alph(
+   char *alphabet			/* the alphabet to set up hashing for */
+ )
+ {
+@@ -116,7 +116,7 @@
+ 	Convert integer-coded sequence to ascii.
+ */
+ /**********************************************************************/
+-extern void r2seq(
++void r2seq(
+   char *seq,
+   char *res,
+   int len
+@@ -145,7 +145,7 @@
+ 	Updates p.
+ */
+ /***********************************************************************/
+-extern char *get_blast_alphabet(
++char *get_blast_alphabet(
+   char *old_alph, 		/* old alphabet IN (but converted to uppercase) */
+   int *p[MAXASCII]		/* permutation and substitution matrix OUT */
+ )
+@@ -226,7 +226,7 @@
+ 	
+ */
+ /**********************************************************************/
+-extern void setup_hash_dnab2protb()
++void setup_hash_dnab2protb()
+ {
+   int i, j;
+   int i0, i1, i2;		/* index in DNAB alphabet of codon */
+@@ -305,7 +305,7 @@
+         Convert a DNA sequence in place to its reverse complement.
+ */
+ /**********************************************************************/
+-extern void invcomp_dna(
++void invcomp_dna(
+   char *sequence,                       /* DNA sequence */
+   long length                            /* length of sequence */
+ )
+@@ -331,7 +331,7 @@
+ 
+ */
+ /**********************************************************************/
+-extern int *dhash_it(
++int *dhash_it(
+   BOOLEAN xlate_dna,			/* database is DNA and motifs protein */
+   int alen,				/* length of alphabet */
+   char *sequence,			/* sequence of sample */
+diff -r 59ed92581a34 -r b2c55b0470c4 src/hash_table.c
+--- a/src/hash_table.c	Tue Mar 06 09:43:43 2012 +1000
++++ b/src/hash_table.c	Thu Mar 08 16:12:32 2012 +1000
+@@ -71,7 +71,7 @@
+ 	Get the number of entries in the hash table.
+ */
+ /**********************************************************************/
+-extern int get_num_entries(
++int get_num_entries(
+   HASH_TABLE ht
+ )
+ {
+diff -r 59ed92581a34 -r b2c55b0470c4 src/heap.c
+--- a/src/heap.c	Tue Mar 06 09:43:43 2012 +1000
++++ b/src/heap.c	Thu Mar 08 16:12:32 2012 +1000
+@@ -397,7 +397,7 @@
+  * Print the contents of the heap to the specified file.
+  *
+  */
+-extern void print_heap(
++void print_heap(
+   FILE *outfile,     ///< The file to print to
+   HEAP *heap         ///< The heap being printed
+ )
+diff -r 59ed92581a34 -r b2c55b0470c4 src/init.c
+--- a/src/init.c	Tue Mar 06 09:43:43 2012 +1000
++++ b/src/init.c	Thu Mar 08 16:12:32 2012 +1000
+@@ -131,12 +131,11 @@
+         Set up all the stuff for meme.
+ */
+ /**********************************************************************/
+-extern void init_meme(
++void init_meme(
+   int argc,                /* number of input arguments */
+   char **argv,             /* input arguments */
+   MODEL **model_p,         /* the model */
+   MODEL **best_model_p,    /* the best model */
+-  MODEL **scratch_model_p, /* the best model */
+   MODEL **neg_model_p,     /* model of negative examples */
+   DATASET **dataset_p,     /* the dataset */
+   DATASET **neg_dataset_p, /* dataset of negative examples */
+@@ -153,7 +152,7 @@
+   P_POINT *p_point;   /* previously learned starting points */
+   char *alphabet;   /* alphabet for dataset */
+   int alength;      /* length of alphabet */
+-  MODEL *model=NULL, *best_model=NULL, *scratch_model=NULL, *neg_model=NULL;
++  MODEL *model=NULL, *best_model=NULL, *neg_model=NULL;
+   DATASET *dataset=NULL, *neg_dataset=NULL;
+   double evt = BIG;   /* no E-value cutoff */
+   BOOLEAN no_print = FALSE;     /* turn off printing if parallel and not main */
+@@ -813,7 +812,6 @@
+   /* create the model */
+   model = create_model(mtype, revcomp, max_w, alength);
+   best_model = create_model(mtype, revcomp, max_w, alength);
+-  scratch_model = create_model(mtype, revcomp, max_w, alength);
+ 
+   /* create the negative dataset and negative model if negative file given */
+   if (negfile) {
+@@ -840,15 +838,16 @@
+   init_llr_pv_tables(2, max_nsites, alength, dataset->back, dataset->pal);
+ 
+   /* set up scratch models */
++  model->pal = pal; //FIXME jj - this was uninitialised
+   model->min_w = min_w;
+   model->max_w = max_w;
+   model->all_widths = all_widths;
+   model->min_nsites = min_nsites;
+   model->max_nsites = max_nsites;
+   copy_model(model, best_model, alength);
+-  copy_model(model, scratch_model, alength);
+ 
+   /* put meme parameters in dataset */
++  dataset->use_llr = 0; // FIXME jj: this wasn't defined
+   dataset->priors = priors;
+   dataset->p_point = p_point;
+   dataset->wg = wg;
+@@ -904,7 +903,6 @@
+ 
+   /* set up return values */
+   *model_p = model;
+-  *scratch_model_p = scratch_model;
+   *best_model_p = best_model;
+   *neg_model_p = neg_model;
+   *dataset_p = dataset;
+@@ -1000,7 +998,7 @@
+   int alength = (dataset ? dataset->alength : 0);
+   double *back = (dataset ? dataset->back : (double *)NULL);
+   PRIORS *priors = (PRIORS *) mymalloc(sizeof(PRIORS));
+-
++  memset(priors, 0, sizeof(PRIORS));
+   priors->ptype = ptype;
+ 
+   /* set up the prior counts */
+diff -r 59ed92581a34 -r b2c55b0470c4 src/io.c
+--- a/src/io.c	Tue Mar 06 09:43:43 2012 +1000
++++ b/src/io.c	Thu Mar 08 16:12:32 2012 +1000
+@@ -29,7 +29,7 @@
+ 	Returns a pointer to the line or NULL if at EOF when called.
+ */
+ /******************************************************************************/
+-extern char *getline2(
++char *getline2(
+   FILE *stream 				/* input stream */
+ ) {
+   char *s = NULL;			/* string to return */
+diff -r 59ed92581a34 -r b2c55b0470c4 src/justlike.c
+--- a/src/justlike.c	Tue Mar 06 09:43:43 2012 +1000
++++ b/src/justlike.c	Thu Mar 08 16:12:32 2012 +1000
+@@ -36,7 +36,7 @@
+ 
+ */
+ /**********************************************************************/
+-extern double like_e_step(
++double like_e_step(
+   MODEL *model,					/* the model */
+   DATASET *dataset 				/* the dataset */
+ )
+diff -r 59ed92581a34 -r b2c55b0470c4 src/likelihood.c
+--- a/src/likelihood.c	Tue Mar 06 09:43:43 2012 +1000
++++ b/src/likelihood.c	Thu Mar 08 16:12:32 2012 +1000
+@@ -32,7 +32,7 @@
+ /*
+   functions
+ */
+-extern int int_compare(
++int int_compare(
+   const void *v1,
+   const void *v2
+ );
+@@ -55,7 +55,7 @@
+ 	If N==0, returns log p-value.
+ */
+ /**********************************************************************/
+-extern double get_log_sig(
++double get_log_sig(
+   double score,					/* score of alignment */
+   MOTYPE mtype,					/* type of model */
+   int w,					/* width of motif */
+@@ -92,7 +92,7 @@
+ 		model->ic
+ */
+ /**********************************************************************/
+-extern void calc_entropy (
++void calc_entropy (
+   MODEL *model,			/* the model */
+   DATASET *dataset  		/* the dataset */
+ )
+@@ -156,7 +156,7 @@
+ */
+ /**********************************************************************/
+  
+-extern double log_comb(
++double log_comb(
+   int m,
+   int n
+ ) 
+@@ -207,7 +207,7 @@
+ 	of segments of length w.
+ */
+ /**********************************************************************/
+-extern double get_log_nalign(
++double get_log_nalign(
+   MOTYPE mtype,					/* type of model */
+   int w,	 				/* width of motif */
+   int N,					/* number of occurrences */
+@@ -264,7 +264,7 @@
+ 
+ */
+ /**********************************************************************/
+-extern double log_qfast(
++double log_qfast(
+   int n,			/* number of random variables in product */
+   double logk			/* product of random variables */
+ )
+@@ -292,7 +292,7 @@
+ 	For sorting with qsort in decreasing order.
+ */
+ /**********************************************************************/
+-extern int int_compare(
++int int_compare(
+   const void *v1,
+   const void *v2
+ )
+diff -r 59ed92581a34 -r b2c55b0470c4 src/llr.c
+--- a/src/llr.c	Tue Mar 06 09:43:43 2012 +1000
++++ b/src/llr.c	Thu Mar 08 16:12:32 2012 +1000
+@@ -93,7 +93,7 @@
+ 
+ */
+ /************************************************************************/
+-extern void init_llr_pv_tables(
++void init_llr_pv_tables(
+   int min,				/* minimum number of sites */
+   int max,				/* maximum number of sites */
+   int alength,				/* alphabet length */
+@@ -490,7 +490,7 @@
+ 	Returns the p-value.
+ */
+ /******************************************************************************/
+-extern double get_llr_pv(
++double get_llr_pv(
+   double llr,				/* log likelihood ratio */
+   double n,				/* wgtd number sequences in alignment */
+   int w,				/* width of alignment */
+@@ -598,7 +598,7 @@
+ 	Assumes get_llr_pv has already been called.
+ */
+ /******************************************************************************/
+-extern double get_llr_mean(
++double get_llr_mean(
+   double n 				/* wgt. number sequences in alignment */
+ )
+ {
+@@ -616,7 +616,7 @@
+ 	are used to speed the calculation.
+ */
+ /************************************************************************/
+-extern int main(
++int main(
+   int argc,
+   char** argv
+ )
+diff -r 59ed92581a34 -r b2c55b0470c4 src/logodds.c
+--- a/src/logodds.c	Tue Mar 06 09:43:43 2012 +1000
++++ b/src/logodds.c	Thu Mar 08 16:12:32 2012 +1000
+@@ -52,7 +52,7 @@
+ 	See (install-path>/bin/make_logodds for format of logodds file.
+ */
+ /**********************************************************************/
+-extern int convert_2_log_odds(
++int convert_2_log_odds(
+   BOOLEAN translate_dna,// DNA sequences and protein motifs 
+   ARRAYLST_T *meme_io_motifs, // meme-io motifs 
+   int meme_io_num_motifs, // meme-io num motifs 
+@@ -211,7 +211,7 @@
+ 	See (install-path>/bin/make_logodds for format of logodds file.
+ */
+ /**********************************************************************/
+-extern int read_log_odds(
++int read_log_odds(
+   BOOLEAN translate_dna,/* DNA sequences and protein motifs */
+   char *filename,	/* file name (output of make_logodds) */
+   char *alphabet,	/* alphabet of log-odds matrices */
+@@ -427,7 +427,7 @@
+ 	and lower-numbered motifs.
+ */
+ /***********************************************************************/
+-extern void motif_corr(
++void motif_corr(
+   int nmotifs,			/* number of motifs */
+   LO *los[]			/* array of logodds structures */
+ )
+@@ -511,7 +511,7 @@
+ 	Create a double-letter logodds matrix for efficiency.
+ */
+ /**********************************************************************/
+-extern void make_double_lo(
++void make_double_lo(
+   LO *los[],		/* array of pointers to log-odds matrices */
+   int nmotifs 		/* number of log-odds matrices in los */
+ )
+@@ -568,7 +568,7 @@
+ 		score_bit = (score/scale) + (w*offset)
+ */
+ /**********************************************************************/
+-extern void scale_lo(
++void scale_lo(
+   LO *los[],		/* array of pointers to log-odds matrices */
+   int nmotifs,		/* number of log-odds matrices in los */
+   int range  		/* set entries in matrices to [0..range] */
+@@ -653,7 +653,7 @@
+ 	Shuffle the columns of each motif.
+ */
+ /**********************************************************************/
+-extern void shuffle_cols(
++void shuffle_cols(
+   LO *los[],		/* array of pointers to log-odds matrices */
+   int nmotifs 		/* number of log-odds matrices in los */
+ )
+@@ -710,7 +710,7 @@
+  * frequencies. The psfm parameter for storing the output must point to
+  * a matrix that has had memory allocated prior to the call to this function.
+  */
+-extern void convert_to_psfm(
++void convert_to_psfm(
+   LO *lo,            ///< Matrix of residue log-odds
+   double *back,      ///< Background frequencies for determining freqs from los
+   double psfm[MAXSITE][MAXALPH]  ///< Matrix in which to store the position
+diff -r 59ed92581a34 -r b2c55b0470c4 src/logs.c
+--- a/src/logs.c	Tue Mar 06 09:43:43 2012 +1000
++++ b/src/logs.c	Thu Mar 08 16:12:32 2012 +1000
+@@ -32,7 +32,7 @@
+ 	Setup lookup table for log(x), 0 < x <= 2
+ */
+ /**********************************************************************/
+-extern void init_log(void)
++void init_log(void)
+ {
+   int i;
+   double x;
+@@ -51,7 +51,7 @@
+ 	Setup lookup table for exp(x), -BITS <= x < 0 
+ */
+ /**********************************************************************/
+-extern void init_exp(void)
++void init_exp(void)
+ {
+   int i;
+   double x;
+diff -r 59ed92581a34 -r b2c55b0470c4 src/mast-util.c
+--- a/src/mast-util.c	Tue Mar 06 09:43:43 2012 +1000
++++ b/src/mast-util.c	Thu Mar 08 16:12:32 2012 +1000
+@@ -109,7 +109,7 @@
+         Returns *scores[] : scores[i][j].ic = score on - strand
+ */
+ /**********************************************************************/
+-extern SCORE **score_sequence(
++SCORE **score_sequence(
+   STYPE stype,          /* how to treat different strands of DNA */
+   BOOLEAN neg_strand,   /* the strand to score */
+   BOOLEAN xlate_dna,    /* database is DNA and motifs protein */
+@@ -316,7 +316,7 @@
+                 weak            otherwise.
+ */
+ /**********************************************************************/
+-extern char *create_diagram(
++char *create_diagram(
+   BOOLEAN dna,                          /* database is DNA */
+   STYPE stype,                          /* treatment of strands of DNA */
+   BOOLEAN xlate_dna,                    /* database is DNA and motifs protein */
+@@ -397,7 +397,7 @@
+         Print the motif block diagram.
+ */
+ /**********************************************************************/
+-extern void print_diagram(
++void print_diagram(
+   char *dia,                            /* motif diagram string */
+   char *hdr,                            /* prefix for each line of diagram */
+   FILE *file                            /* destination file */
+@@ -567,7 +567,7 @@
+                         (p)     p-value (optional)      
+ */
+ /**********************************************************************/
+-extern void make_block(
++void make_block(
+   int m,                        /* motif number */
+   char *strand,                 /* strand */
+   int f,                        /* frame number; f=0 not translating DNA */
+@@ -612,7 +612,7 @@
+         Caller is responsible for deallocating contents of TILING.
+ */
+ /**********************************************************************/
+-extern TILING score_tile_diagram(
++TILING score_tile_diagram(
+   FILE *mast_out,                       /* output */
+   char *sequence,                       /* sequence to score and tile */
+   long length,                          /* length of sequence */
+@@ -737,7 +737,7 @@
+ 
+ */
+ /**********************************************************************/
+-extern double qfast(
++double qfast(
+   int n,                        /* number of random variables in product */
+   double k                      /* product of random variables */
+ )
+@@ -780,7 +780,7 @@
+         Returns the background frequencies for the BLAST alphabet.
+ */
+ /**********************************************************************/
+-extern double *init_mast_background(
++double *init_mast_background(
+   char *bfile,                          /* name of background file */
+   const char *alphabet,                 /* motif alphabet */
+   STYPE stype,                          /* handling of DNA strands */
+@@ -872,10 +872,11 @@
+         Free a tiling structure.
+ */
+ /**********************************************************************/
+-extern void free_tiling(
++void free_tiling(
+   TILING tiling
+ ) 
+ {
++    myfree(tiling.hits);
+     myfree(tiling.pvalues);
+     myfree(tiling.svalues);
+     myfree(tiling.diagram);
+diff -r 59ed92581a34 -r b2c55b0470c4 src/mast.c
+--- a/src/mast.c	Tue Mar 06 09:43:43 2012 +1000
++++ b/src/mast.c	Thu Mar 08 16:12:32 2012 +1000
+@@ -1601,7 +1601,7 @@
+   main routine
+ */
+ /**********************************************************************/
+-extern int main (int argc, char *argv[])
++int main (int argc, char *argv[])
+ {
+   /* declarations */
+   /*{{{*/
+diff -r 59ed92581a34 -r b2c55b0470c4 src/meme-print-html.c
+--- a/src/meme-print-html.c	Tue Mar 06 09:43:43 2012 +1000
++++ b/src/meme-print-html.c	Thu Mar 08 16:12:32 2012 +1000
+@@ -24,7 +24,7 @@
+ Print MEME results in HTML format.
+ Format XML as HTML using a stylesheet and an XSLT
+ **********************************************************************/
+-extern void print_meme_file_html(
++void print_meme_file_html(
+     char* stylesheet_file_path,   /* path to MEME XSL stylesheet IN */
+     char* input_file_path,        /* path to XML input file IN */
+     char* output_file_path        /* path to HTML output file IN */
+diff -r 59ed92581a34 -r b2c55b0470c4 src/meme.c
+--- a/src/meme.c	Tue Mar 06 09:43:43 2012 +1000
++++ b/src/meme.c	Thu Mar 08 16:12:32 2012 +1000
+@@ -119,7 +119,7 @@
+ */
+ /**********************************************************************/
+ 
+-extern int main(
++int main(
+   int argc,
+   char *argv[]
+ )
+@@ -130,7 +130,6 @@
+   MODEL *model;			/* the model */
+   MODEL *neg_model;		/* the model of negatives */
+   MODEL *best_model;		/* the best model found (so far) */
+-  MODEL *scratch_model;		/* a scratch model */
+   CANDIDATE *candidates = NULL;	/* list of candidate models */
+   MOTIF_SUMMARY *motif_summaries = NULL; /* properties of final motifs */
+   int n_starts = 0;		/* number of starting points */
+@@ -165,9 +164,9 @@
+ 
+   /* initialize everything from the command line */
+   char *output_dirname = NULL;
+-  BOOLEAN all_widths;
++  //BOOLEAN all_widths;
+   init_meme(
+-    argc, argv, &model, &best_model, &scratch_model, &neg_model,
++    argc, argv, &model, &best_model, &neg_model,
+     &dataset, &neg_dataset, text_filename, &output_dirname, &text_output
+   );
+   if (model->all_widths)
+@@ -385,6 +384,7 @@
+     for (sp_idx = 0; sp_idx < n_starts; sp_idx++) {
+       free_s_point(&(s_points[sp_idx]));
+     }
++    free(s_points);
+     
+ #ifdef DEBUG_PARALLEL
+     fprintf(stderr, "%d: past check time\n", mpMyID()); fflush(stderr);
+@@ -522,11 +522,35 @@
+ 
+     // Free arrays in motif_summaries
+     for (i = 0; i < imotif; i++) {
+-      free_2array(motif_summaries[i].pssm, motif_summaries[i].width);
+-      free_2array(motif_summaries[i].psfm, motif_summaries[i].width);
++      // FIXME jj:
++      // it is width + 1 on the call to create_2array in display.c:record_results
++      // I don't think the +1 is used but I've choosen to leave it in case
++      // I've missed something
++      free_2array(motif_summaries[i].pssm, motif_summaries[i].width + 1);
++      free_2array(motif_summaries[i].psfm, motif_summaries[i].width + 1);
++      free(motif_summaries[i].sites);
++      free(motif_summaries[i].regexp);
+     }
++    free(motif_summaries);
+   } // !no_print
+ 
++  free_model(model);  
++  free_model(neg_model);
++  free_model(best_model);
++  free(candidates);
++  free_2array(dataset->map, dataset->alength + 1);
++  free_2array(dataset->lomap, dataset->alength + 1);
++  free(dataset->command);
++  for (i = 0; i < dataset->p_point->c; i++) free(dataset->p_point->e_cons0);
++  free(dataset->p_point);
++  free_PriorLib(dataset->priors->plib);
++  free(dataset->priors);
++  free(dataset->back);
++  free(dataset->branch_params);
++  free(dataset->res_freq);
++  free(dataset->samples);
++  free(dataset);
++
+ #ifdef PARALLEL
+ #ifdef DEBUG_PARALLEL
+   fprintf(stderr, "%d: At mpFinalize\n", mpMyID()); fflush(stderr);
+diff -r 59ed92581a34 -r b2c55b0470c4 src/meme.h
+--- a/src/meme.h	Tue Mar 06 09:43:43 2012 +1000
++++ b/src/meme.h	Thu Mar 08 16:12:32 2012 +1000
+@@ -504,12 +504,14 @@
+   MODEL *m2,        /* destination */
+   int alength       /* length of alphabet */
+ );
++void free_model(
++    MODEL *model    /* model */
++);
+ extern void init_meme(
+   int argc,                /* number of input arguments */
+   char **argv,             /* input arguments */
+   MODEL **model_p,         /* the model OUT */
+   MODEL **best_model_p,    /* the best model OUT */
+-  MODEL **scratch_model_p, /* the best model OUT */
+   MODEL **neg_model_p,     /* model of negative examples OUT */
+   DATASET **dataset_p,     /* the dataset OUT */
+   DATASET **neg_dataset_p, /* dataset of negative examples OUT */
+diff -r 59ed92581a34 -r b2c55b0470c4 src/meme_util.c
+--- a/src/meme_util.c	Tue Mar 06 09:43:43 2012 +1000
++++ b/src/meme_util.c	Thu Mar 08 16:12:32 2012 +1000
+@@ -44,7 +44,7 @@
+ 
+ */
+ /**********************************************************************/
+-extern void copy_theta(
++void copy_theta(
+   THETA s,	 		/* source */
+   THETA d,			/* destination */
+   int w,			/* width of motif */
+@@ -73,7 +73,7 @@
+ 
+ */
+ /**********************************************************************/
+-extern void get_not_o(
++void get_not_o(
+   DATASET *dataset,		// the dataset
+   int w				// motif width
+ )
+@@ -114,7 +114,7 @@
+ 	Create a model structure.
+ */
+ /**********************************************************************/
+-extern MODEL *create_model(
++MODEL *create_model(
+   MOTYPE mtype,				/* type of model */
+   BOOLEAN invcomp,			/* use inv comp strand  */
+   int max_w,				/* maximum width of motif */
+@@ -133,6 +133,7 @@
+   create_2array(model->obs, double, max_w+1, alength);
+   model->maxima = NULL;
+   model->w = 0;
++  model->max_w = max_w;
+   model->cons[0] = 0;
+   model->cons0[0] = 0;
+ 
+@@ -147,7 +148,7 @@
+   Copy a model structure.
+ */
+ /**********************************************************************/
+-extern void copy_model(
++void copy_model(
+   MODEL *m1, 				/* source */
+   MODEL *m2,				/* destination */
+   int alength				/* length of alphabet */
+@@ -155,6 +156,7 @@
+ {
+   int i;
+ 
++  m2->all_widths = m1->all_widths; // FIXME jj - this was left uncopied
+   m2->mtype = m1->mtype;
+   m2->min_w = m1->min_w;
+   m2->max_w = m1->max_w;
+@@ -198,6 +200,23 @@
+ 
+ /**********************************************************************/
+ /*
++  free_model
++
++  Free a model structure.
++*/
++/**********************************************************************/
++void free_model(MODEL *model) {
++  if (!model) return;
++  free_2array(model->theta, model->max_w + 1);
++  free_2array(model->logtheta, model->max_w+1);
++  free_2array(model->logtheta_rc, model->max_w+1);
++  free_2array(model->obs, model->max_w+1);
++  free(model->maxima);
++  free(model);
++}
++
++/**********************************************************************/
++/*
+ 	get_sites
+ 
+ 	Get the principal sites contributing to a motif.
+@@ -210,7 +229,7 @@
+ 	Returns a list consisting of sites and sets n, the number of sites.
+ */
+ /**********************************************************************/
+-extern SITE *get_sites(
++SITE *get_sites(
+   DATASET *dataset,			/* the dataset */
+   MODEL *model,				/* the model */
+   int *n,				/* number of sites found */
+@@ -318,7 +337,7 @@
+ 	column.
+ */
+ /**********************************************************************/
+-extern LOGODDS make_log_odds(
++LOGODDS make_log_odds(
+   THETA theta1,			/* positive motif theta */
+   THETA theta0,			/* negative motif theta; use 0 if NULL */
+   double *back,			/* background frequencies; use 0 if NULL */
+@@ -377,7 +396,7 @@
+  * \return The number of elements in the array of the most probable sites in the
+  * dataset
+  */
+-extern int get_pred_sites (
++int get_pred_sites (
+   P_PROB psites,     ///< An array to contain the predicted sites
+   MOTYPE mtype,       ///< Model type
+   int w,             ///< Length of seed being evaluated
+@@ -420,7 +439,7 @@
+  *
+  * Prints the specified array of sites to the specified file handle.
+  */
+-extern void print_site_array(
++void print_site_array(
+   P_PROB sites,      ///< An array of sites to be printed
+   int nsites,        ///< Length of the array
+   FILE *outfile,     ///< The stream for output
+@@ -452,7 +471,7 @@
+  *
+  * /return The location of the first site in the sequence, counting from 0
+  */
+-extern int get_first_siteloc (
++int get_first_siteloc (
+   char *descript     ///< The description of the sequence; contains site info
+ )
+ {
+@@ -499,7 +518,7 @@
+  * alignment specified by "offset". Each overhanging character by either string
+  * is counted as a single difference.
+  */ 
+-extern int get_n_strdiffs (
++int get_n_strdiffs (
+   char *str1,        ///< A string in the aligned pair
+   char *str2,        ///< A string in the aligned pair
+   int offset         ///< Number of characters str1 is shifted to the right of
+@@ -575,7 +594,7 @@
+  *  ith value of difference column =
+  *  ith value of the first input column - ith value of second input column
+  */
+-extern void vector_subtract(
++void vector_subtract(
+   int *col_a,        ///< Positive column
+   int *col_b,        ///< Negative column
+   int *diff_col,     ///< Column in which to store the differences
+@@ -598,7 +617,7 @@
+  *
+  * \return the array of integers in the geometric progression
+  */
+-extern int *make_geometric_prog (
++int *make_geometric_prog (
+   int min_val,       ///< Minimum integer value in the geometric progression
+   int max_val,       ///< Maximum integer value in the geometric progression
+   double factor,     ///< Factor specifying rate of increase in progression
+diff -r 59ed92581a34 -r b2c55b0470c4 src/message.c
+--- a/src/message.c	Tue Mar 06 09:43:43 2012 +1000
++++ b/src/message.c	Thu Mar 08 16:12:32 2012 +1000
+@@ -505,7 +505,7 @@
+ 	Get the precalculated astarting and ending sequences and offsets.
+ */
+ /**********************************************************************/
+-extern void get_start_n_end (
++void get_start_n_end (
+   int *start_seq,			/* starting sequence number */
+   int *start_off,			/* offset in starting sequence */
+   int *end_seq,				/* ending sequence number */
+@@ -524,7 +524,7 @@
+  * Print some of the contents of a model.
+  * (Debugging only.)
+  **********************************************************************/
+-extern void print_model(
++void print_model(
+    char *label,
+    MODEL *model
+ )
+diff -r 59ed92581a34 -r b2c55b0470c4 src/motifs.c
+--- a/src/motifs.c	Tue Mar 06 09:43:43 2012 +1000
++++ b/src/motifs.c	Thu Mar 08 16:12:32 2012 +1000
+@@ -54,7 +54,7 @@
+ #define DATA_HASH_SIZE 100000
+ #define RCHUNK 100
+ 
+-extern int read_motifs (
++int read_motifs (
+   FILE *fdata,                          /* opened dataset file */
+   char *filename,                       /* motif file */
+   MOTIF motif[NMOTIFS],                 /* motif info */
+diff -r 59ed92581a34 -r b2c55b0470c4 src/mp.c
+--- a/src/mp.c	Tue Mar 06 09:43:43 2012 +1000
++++ b/src/mp.c	Thu Mar 08 16:12:32 2012 +1000
+@@ -27,7 +27,7 @@
+ 	Wrapper on MPI_Init
+ */
+ /***********************************************************************/
+-extern void mpInit(
++void mpInit(
+   int *argc,
+   char **argv[]
+ )
+@@ -60,7 +60,7 @@
+ 	Wrapper on MPI_Finalize
+ */
+ /***********************************************************************/
+-extern void mpFinalize()
++void mpFinalize()
+ {
+   MPI_Finalize();
+ }
+diff -r 59ed92581a34 -r b2c55b0470c4 src/oops.c
+--- a/src/oops.c	Tue Mar 06 09:43:43 2012 +1000
++++ b/src/oops.c	Thu Mar 08 16:12:32 2012 +1000
+@@ -315,7 +315,7 @@
+ 	Create a reverse-complement version, too.
+ */
+ /**********************************************************************/
+-extern void convert_theta_to_log(
++void convert_theta_to_log(
+   MODEL *model,				/* the model */
+   DATASET *dataset			/* the dataset */
+ )
+diff -r 59ed92581a34 -r b2c55b0470c4 src/partition.c
+--- a/src/partition.c	Tue Mar 06 09:43:43 2012 +1000
++++ b/src/partition.c	Thu Mar 08 16:12:32 2012 +1000
+@@ -19,7 +19,7 @@
+  *
+  * \return A pointer to the new object.
+  */
+-extern PARTITION *new_partition(
++PARTITION *new_partition(
+   int part_min_w,   ///< Minimum w value in the partition
+   int part_max_w,   ///< Maximum w value in the partition
+   int central_w,    ///< Central w value of this partition
+@@ -49,7 +49,7 @@
+  * Print a representation of this partition.
+  *
+  */
+-extern void print_partition (
++void print_partition (
+   PARTITION *part,   ///< The partition being printed
+   FILE *out          ///< The output destination.
+ ) {
+diff -r 59ed92581a34 -r b2c55b0470c4 src/prior.c
+--- a/src/prior.c	Tue Mar 06 09:43:43 2012 +1000
++++ b/src/prior.c	Thu Mar 08 16:12:32 2012 +1000
+@@ -53,6 +53,35 @@
+ }
+ 
+ /* ---------------------------------------------------------------------- */
++void free_PriorLib(PriorLib *plib) 
++/*
++ *    plib    PriorLib struct to deallocate
++ */
++{
++  int i;
++  if (plib == NULL) return;
++  free(plib->Mix);
++  free(plib->B);
++  free(plib->FullUpdate);
++  free(plib->QUpdate);
++  for (i = 0; i < plib->L; i++) {
++    free(plib->Distr[i]);
++    free(plib->StructID[i]);
++    free(plib->Comment[i]);
++  }
++  // set pointers to null
++  memset(plib->Distr, 0, sizeof(Real *) * plib->L);
++  memset(plib->StructID, 0, sizeof(char *) * plib->L);
++  memset(plib->Comment, 0, sizeof(char *) * plib->L);
++  free(plib->Distr);
++  free(plib->StructID);
++  free(plib->Comment);
++  // set pointers to null
++  memset(plib, 0, sizeof(PriorLib));
++  free(plib);
++}
++
++/* ---------------------------------------------------------------------- */
+ PriorLib *read_PriorLib(char *plib_name, double desired_beta)
+ /*
+ 	plib_name	name of prior library file
+@@ -180,7 +209,7 @@
+ }
+ 
+ /* ---------------------------------------------------------------------- */
+-extern void mixture_regularizer(
++void mixture_regularizer(
+   double *freq, 		/* obs freq */
+   PriorLib *Lib,		/* priors */ 
+   double *reg			/* pseudo-counts */
+diff -r 59ed92581a34 -r b2c55b0470c4 src/psp.c
+--- a/src/psp.c	Tue Mar 06 09:43:43 2012 +1000
++++ b/src/psp.c	Thu Mar 08 16:12:32 2012 +1000
+@@ -65,7 +65,7 @@
+ 
+ */
+ /**********************************************************************/
+-extern void read_psp_file(
++void read_psp_file(
+   char *psp_filename,		// PSP file name
+   DATASET *dataset,		// the dataset
+   BOOLEAN psp_revcomp, 		// PSP file contains both strands
+@@ -235,7 +235,7 @@
+ 
+  */
+ /**********************************************************************/
+-extern void psp_renormalize(
++void psp_renormalize(
+   DATASET *dataset,		/* the dataset */
+   int new_w,			/* new motif width */
+   BOOLEAN revcomp,		/* reverse complement? */
+@@ -353,7 +353,7 @@
+ 	add_psp_to_log_not_o
+ */
+ /**********************************************************************/
+-extern void add_psp_to_log_not_o(
++void add_psp_to_log_not_o(
+   DATASET *dataset,		/* the dataset */
+   int w,			/* motif width */
+   BOOLEAN invcomp,		/* reverse complement? */
+diff -r 59ed92581a34 -r b2c55b0470c4 src/pssm-distr.c
+--- a/src/pssm-distr.c	Tue Mar 06 09:43:43 2012 +1000
++++ b/src/pssm-distr.c	Thu Mar 08 16:12:32 2012 +1000
+@@ -38,7 +38,7 @@
+         for 0 <= x <= range*w.
+ */
+ /**********************************************************************/
+-extern double *calc_pssm_cdf(
++double *calc_pssm_cdf(
+   int w,                /* width of PSSM */
+   int alen,             /* length of alphabet */
+   int range,            /* largest value in PSSM */
+diff -r 59ed92581a34 -r b2c55b0470c4 src/read_seq_file.c
+--- a/src/read_seq_file.c	Tue Mar 06 09:43:43 2012 +1000
++++ b/src/read_seq_file.c	Thu Mar 08 16:12:32 2012 +1000
+@@ -101,7 +101,7 @@
+         Check if sample name is defined in ht_seq_names hash table
+ */
+ /**********************************************************************/
+-extern SAMPLE *get_sample_by_name(
++SAMPLE *get_sample_by_name(
+   char *sample_name
+ )
+ {
+@@ -119,7 +119,7 @@
+ 	setup_hash_alphabet must have been called prior to first call to this.
+ */
+ /**********************************************************************/
+-extern DATASET *read_seq_file(
++DATASET *read_seq_file(
+   char *file_name,		/* name of file to open */
+   char *alpha,			/* alphabet used in sequences */
+   BOOLEAN use_comp,		/* use complementary strands, too */
+@@ -236,6 +236,8 @@
+       }
+       hash_set_entry_value(sample, hash_entry);
+     }
++    /* cleanup sequence (create_sample copies it) */
++    myfree(sequence);
+     
+   } /* sequences */
+   if (length < 0) error = TRUE;			/* read_sequence error */
+diff -r 59ed92581a34 -r b2c55b0470c4 src/read_sequence.c
+--- a/src/read_sequence.c	Tue Mar 06 09:43:43 2012 +1000
++++ b/src/read_sequence.c	Thu Mar 08 16:12:32 2012 +1000
+@@ -25,7 +25,7 @@
+         setup_hash_alphabet must have been called prior to first call to this.
+ */
+ /**********************************************************************/
+-extern BOOLEAN read_sequence(
++BOOLEAN read_sequence(
+   FILE *data_file,                /* file containing sequences */
+   char **sample_name,                /* unique identifier of sequence */
+   char **sample_de,                /* descriptor of sequence */
+diff -r 59ed92581a34 -r b2c55b0470c4 src/readseq.c
+--- a/src/readseq.c	Tue Mar 06 09:43:43 2012 +1000
++++ b/src/readseq.c	Thu Mar 08 16:12:32 2012 +1000
+@@ -714,7 +714,7 @@
+ #else
+ #define Exit(a)   exit(a)
+ 
+-extern int main( int argc, char *argv[])
++int main( int argc, char *argv[])
+ #endif
+ {
+ boolean   closein = false;
+diff -r 59ed92581a34 -r b2c55b0470c4 src/regress.c
+--- a/src/regress.c	Tue Mar 06 09:43:43 2012 +1000
++++ b/src/regress.c	Thu Mar 08 16:12:32 2012 +1000
+@@ -17,7 +17,7 @@
+ 
+ 	Returns the root mean squared error of the fit.
+ */
+-extern double regress(
++double regress(
+   int n,			/* number of points */
+   double *x,			/* x values */
+   double *y,			/* y values */
+diff -r 59ed92581a34 -r b2c55b0470c4 src/seed.c
+--- a/src/seed.c	Tue Mar 06 09:43:43 2012 +1000
++++ b/src/seed.c	Thu Mar 08 16:12:32 2012 +1000
+@@ -317,7 +317,7 @@
+  * the length of the seed in the given parameter and returning the integer
+  * array.
+  */
+-extern char *to_e_seed (
++char *to_e_seed (
+   char *str_seed,    ///< ASCII representation
+   int *seed_len      ///< The length of the resulting e_seed
+ )
+diff -r 59ed92581a34 -r b2c55b0470c4 src/seed_diffs.c
+--- a/src/seed_diffs.c	Tue Mar 06 09:43:43 2012 +1000
++++ b/src/seed_diffs.c	Thu Mar 08 16:12:32 2012 +1000
+@@ -59,7 +59,7 @@
+  * \return A SEED_DIFFS object representing the differences between the two
+  * seeds under the implicit alignment determined by this function.
+  */
+-extern SEED_DIFFS *get_seed_diffs (
++SEED_DIFFS *get_seed_diffs (
+   char *old_seed,    ///< String representation of the old seed
+   char *new_seed,    ///< String representation of the new seed
+   int lmap[MAXALPH][MAXALPH] ///< Log freq x letter map (used for generating
+@@ -167,7 +167,7 @@
+  *
+  * "Destructor" method: Free the memory associated with this seed diffs object.
+  */
+-extern void free_seed_diffs (
++void free_seed_diffs (
+   SEED_DIFFS *s_diffs ///< "This" seed_diffs object
+ ) {
+   // Destroy the diff_columns:
+@@ -201,7 +201,7 @@
+  *
+  * \return The offset
+  */
+-extern int get_seed_shift(
++int get_seed_shift(
+   SEED_DIFFS *diffs  ///< The seed_diffs object
+ ) {
+   return diffs->old_new_shift;
+@@ -219,7 +219,7 @@
+  *
+  * \return The array of lmotif difference columns
+  */
+-extern int **get_diff_cols(
++int **get_diff_cols(
+   SEED_DIFFS *diffs  ///< The seed_diffs object
+ ) {
+   return diffs->diff_cols;
+@@ -236,7 +236,7 @@
+  *
+  * \return An array of indices.
+  */
+-extern int *get_diff_idxs (
++int *get_diff_idxs (
+   SEED_DIFFS *diffs  ///< The seed_diffs object
+ ) {
+   return diffs->diff_idxs;
+@@ -250,7 +250,7 @@
+  *
+  * \return Number of differing characters in the implicit alignment.
+  */
+-extern int get_n_diffs (
++int get_n_diffs (
+   SEED_DIFFS *diffs  ///< The seed_diffs object
+ ) {
+   return diffs->n_diffs;
+@@ -263,7 +263,7 @@
+  * Get the lengths of each of the seeds
+  *
+  */
+-extern void get_seed_lengths (
++void get_seed_lengths (
+   SEED_DIFFS *diffs, ///< The seed_diffs object
+   int *length_old,   ///< The length of the old seed - OUT
+   int *length_new    ///< The length of the new seed - OUT
+@@ -463,7 +463,7 @@
+  *
+  * Print a representation of this seed_diffs object to the specified file.
+  */
+-extern void print_seed_diffs (
++void print_seed_diffs (
+   SEED_DIFFS *diffs, ///< Seed diffs object
+   FILE *out
+ ) {
+diff -r 59ed92581a34 -r b2c55b0470c4 src/seq2theta.c
+--- a/src/seq2theta.c	Tue Mar 06 09:43:43 2012 +1000
++++ b/src/seq2theta.c	Thu Mar 08 16:12:32 2012 +1000
+@@ -52,7 +52,7 @@
+ */
+ /**********************************************************************/
+ 
+-extern THETA init_map(
++THETA init_map(
+   MAP_TYPE type,		/* type of mapping:
+ 					Uni	- add n prior
+ 					Pam	- pam matrix
+@@ -235,7 +235,7 @@
+  * a vector for mapping an "X" character to a vector of letter probabilities.
+  * Those probabilities are uniform across all letters.
+  */
+-extern void convert_to_lmap (
++void convert_to_lmap (
+   THETA map,
+   int lmap[MAXALPH][MAXALPH],
+   int alength
+@@ -270,7 +270,7 @@
+ 	  there is a row for 'X'.
+ */
+ /**********************************************************************/
+-extern void init_theta(
++void init_theta(
+   THETA theta,			/* theta */
+   char *start,			/* integer encoded starting sequence */
+   int w,			/* width of motif */
+@@ -296,7 +296,7 @@
+  * Convert the entries in the specified matrix motif model from doubles to INT
+  * LOG values.
+  */
+-extern void convert_to_ltheta (
++void convert_to_ltheta (
+   double matrix_ds[MAXSITE][MAXALPH], ///< The input matrix of doubles
+   int matrix_il[MAXSITE][MAXALPH], ///< The output matrix of int logs
+   int nrows,
+diff -r 59ed92581a34 -r b2c55b0470c4 src/sp_matrix.c
+--- a/src/sp_matrix.c	Tue Mar 06 09:43:43 2012 +1000
++++ b/src/sp_matrix.c	Thu Mar 08 16:12:32 2012 +1000
+@@ -64,7 +64,7 @@
+  * \return An SP_MATRIX object containing the matrix of empty S_POINTS
+  * and other information describing the matrix properties.
+  */
+-extern SP_MATRIX *create_spoint_matrix (
++SP_MATRIX *create_spoint_matrix (
+   int *central_ws,   ///< A sorted list of central widths values for the matrix
+   int n_ws,          ///< The number of central width values
+   int *central_ns,   ///< A sorted list of central nsites values for the matrix
+@@ -111,7 +111,7 @@
+   return sp_matrix;
+ } // create_spoint_matrix
+ 
+-
++int info_cons0_alloc =  0;
+ /**      
+  * create_spoint_row
+  *
+@@ -120,7 +120,7 @@
+  *
+  * \return The newly created row, which can then be added to a matrix.
+  */
+-extern S_POINT *create_spoint_row (
++S_POINT *create_spoint_row (
+   int width,         ///< The width of all s_points in the current row
+   int *central_ws,   ///< A sorted list of central widths values for the matrix
+   int n_ws,          ///< The number of central width values
+@@ -198,6 +198,7 @@
+     double factor = dataset->hs_decrease;
+     int heap_size = MAX((int)max_hs/(pow(factor, manhattan_dist)), 1);
+ 
++    info_cons0_alloc++;
+     Resize(s_point_row[col_idx].cons0, width+1, char);
+     s_point_row[col_idx].cons0[0] = '\0';
+     s_point_row[col_idx].seed_heap = create_heap(
+@@ -218,7 +219,7 @@
+  * free_sp_matrix
+  *
+  */
+-extern void free_sp_matrix (
++void free_sp_matrix (
+   SP_MATRIX *sp_mat  ///< The object being destroyed.  
+ ) {
+   // Free the internal representation of the matrix...
+@@ -266,10 +267,16 @@
+  * memory leak.
+  *
+  */
+-extern void free_s_point (
++void free_s_point (
+   S_POINT *sp        ///< The item being destroyed.
+ ) {
+   destroy_heap(sp->seed_heap);
++  if (sp->cons0) info_cons0_alloc--;
++  // In an attempt to remove memory leaks I'm going to copy the 
++  // e_cons0 and cons0 every time so I can free it here.
++  free(sp->e_cons0);
++  free(sp->cons0);
++  memset(sp, 0, sizeof(S_POINT));
+ } // free_s_point
+ 
+ 
+@@ -281,7 +288,7 @@
+  * if it existed.
+  *
+  */
+-extern void copy_s_point (
++void copy_s_point (
+   S_POINT *s_point,  ///< The S_POINT being copied
+   S_POINT *sp_copy   ///< The copy of the S_POINT - OUT
+ ) {
+@@ -317,7 +324,7 @@
+  * Print a representation of a specified s_point. This is yet another
+  * function that should be a "method" of the s_point class.
+  */
+-extern void print_s_point (
++void print_s_point (
+   S_POINT *s_point,  ///< The object being printed.
+   FILE *out          ///< The output destination.
+ ) {
+@@ -343,7 +350,7 @@
+  * Transfer the scores of the best seeds in the S_POINT heaps into the
+  * S_POINTs themselves.
+  */
+-extern void transfer_final_scores (
++void transfer_final_scores (
+   SP_MATRIX *sp_matrix ///< This object
+ ) {
+   // Proceed through the entire matrix, transfering the details for each
+@@ -362,7 +369,7 @@
+         curr_sp->iseq = -1; // Seed does not correspond to a location in the dataset.
+         curr_sp->ioff = -1; // Seed does not correspond to a location in the dataset.
+         curr_sp->e_cons0 = get_e_seed(best_seed);
+-        curr_sp->cons0 = get_str_seed(best_seed);
++        curr_sp->cons0 = strdup(get_str_seed(best_seed));
+       }
+ 
+       /* If the seed heap of the current s_point is empty, then it could
+@@ -386,7 +393,7 @@
+  * \return The minimum width encompassed by this sp_matrix.
+  *
+  */
+-extern int get_min_width (
++int get_min_width (
+   SP_MATRIX *sp_mat  ///< The sp_matrix object.
+ ) {
+   return sp_mat->central_ws[0];
+@@ -399,7 +406,7 @@
+  * \return The maximum width of any s_point in the matrix.
+  *
+  */
+-extern int get_max_width (
++int get_max_width (
+   SP_MATRIX *sp_mat  ///< The sp_matrix object.
+ ) {
+   return sp_mat->central_ws[sp_mat->n_ws - 1];
+@@ -412,7 +419,7 @@
+  * \return An array of the central nsites-values in the matrix.
+  *
+  */
+-extern int *get_central_ws (
++int *get_central_ws (
+   SP_MATRIX *sp_mat  ///< The sp_matrix object.
+ ) {
+   return sp_mat->central_ws;
+@@ -425,7 +432,7 @@
+  * \return An array of the central nsites values in the matrix.
+  *
+  */
+-extern int *get_central_ns (
++int *get_central_ns (
+   SP_MATRIX *sp_mat  ///< The sp_matrix object.
+ ) {
+   return sp_mat->central_ns;
+@@ -438,7 +445,7 @@
+  * \return The minimum nsites encompassed by this sp_matrix.
+  *
+  */
+-extern int get_min_nsites (
++int get_min_nsites (
+   SP_MATRIX *sp_mat  ///< The sp_matrix object.
+ ) {
+   return sp_mat->central_ns[0];
+@@ -451,7 +458,7 @@
+  * \return The maximum nsites of any s_point in the matrix.
+  *
+  */
+-extern int get_max_nsites (
++int get_max_nsites (
+   SP_MATRIX *sp_mat  ///< The sp_matrix object.
+ ) {
+   return sp_mat->central_ns[sp_mat->n_ns - 1];
+@@ -465,7 +472,7 @@
+  * \return The number of "central" width values in the matrix:
+  *
+  */
+-extern int get_num_central_widths (
++int get_num_central_widths (
+   SP_MATRIX *sp_mat  ///< The sp_matrix object.
+ ) {
+   return sp_mat->n_ws;
+@@ -479,7 +486,7 @@
+  * \return The number of "central" nsites values in the matrix:
+  *
+  */
+-extern int get_num_central_nsites (
++int get_num_central_nsites (
+   SP_MATRIX *sp_mat  ///< The sp_matrix object.
+ ) {
+   return sp_mat->n_ns;
+@@ -494,7 +501,7 @@
+  * is equal to the number of rows in the matrix.
+  *
+  */
+-extern int sp_get_num_rows (
++int sp_get_num_rows (
+   SP_MATRIX *sp_mat
+ ) {
+   return (get_max_width(sp_mat) - get_min_width(sp_mat) + 1);
+@@ -508,7 +515,7 @@
+  * This is equal to the number of columns in the matrix.
+  *
+  */
+-extern int sp_get_num_cols (
++int sp_get_num_cols (
+   SP_MATRIX *sp_mat
+ ) {
+   return (get_max_nsites(sp_mat) - get_min_nsites(sp_mat) + 1);
+@@ -522,7 +529,7 @@
+  * the matrix itself
+  *
+  */
+-extern S_POINT **get_sp_matrix (
++S_POINT **get_sp_matrix (
+   SP_MATRIX *sp_mat
+ ) {
+   return sp_mat->matrix;
+@@ -538,7 +545,7 @@
+  * \return An array of all S_POINTS with the specified seed width.
+  *
+  */
+-extern S_POINT *get_sp_arr (
++S_POINT *get_sp_arr (
+   SP_MATRIX *sp_mat, ///< The spoint matrix
+   int seed_width     ///< The number of the desired row
+ ) {
+@@ -561,7 +568,7 @@
+  * \return A pointer to the apporpriate S_POINT object
+  *
+  */
+-extern S_POINT *get_spoint (
++S_POINT *get_spoint (
+   SP_MATRIX *sp_mat, ///< The spoint matrix
+   int row_idx,       ///< The row of the desired spoint
+   int col_idx        ///< The column of the desired spoint
+@@ -578,7 +585,7 @@
+  * \return A pointer to the apporpriate S_POINT object
+  *
+  */
+-extern S_POINT *get_s_point (
++S_POINT *get_s_point (
+   SP_MATRIX *sp_mat, ///< The s_point matrix
+   int width,         ///< The width the desired s_point
+   int nsites         ///< The nsites of the desired s_point
+@@ -598,7 +605,7 @@
+  * possibly different for each S_POINT, and was stored in each of the S_POINTs
+  * prior to the calling of this function.
+  */
+-extern void update_s_point_heaps(
++void update_s_point_heaps(
+   S_POINT *s_points, ///< The s_points whose heaps are to be updated.
+   char *str_seed,    ///< The ascii representation of the seed being added to
+                      ///< each of the S_POINT heaps.
+@@ -757,7 +764,7 @@
+  * no S_POINT had a score greater than LITTLE
+  *
+  */
+-extern S_POINT *choose_em_starts (
++S_POINT *choose_em_starts (
+   SP_MATRIX *sp_matrix, ///< The matrix of S_POINT objects to choose from.
+   DATASET *data,     ///< Sequence dataset.
+   MODEL *model,      ///< The nascent motif model. Contains parameters needed
+@@ -793,6 +800,7 @@
+       // chosen s_points:
+       int curr_sp_idx = n_spoints - 1;
+       copy_s_point(best_sp, &(sp_arr[curr_sp_idx]));
++      info_cons0_alloc++;
+     }
+   } // part_idx
+ 
+@@ -869,7 +877,7 @@
+  * Print a representation of this matrix.
+  *
+  */
+-extern void print_sp_matrix (
++void print_sp_matrix (
+   SP_MATRIX *sp_mat, ///< The matrix being printed
+   FILE *out          ///< The output destination.
+ ) {
+@@ -1111,7 +1119,7 @@
+  * \return A heap containing the seeds from EVERY s_point heap in the matrix
+  */
+ 
+-extern HEAP *create_heap_from_sp_matrix (
++HEAP *create_heap_from_sp_matrix (
+   SP_MATRIX *sp_mat    // the matrix of s_points 
+ ) {
+ 
+diff -r 59ed92581a34 -r b2c55b0470c4 src/starts.c
+--- a/src/starts.c	Tue Mar 06 09:43:43 2012 +1000
++++ b/src/starts.c	Thu Mar 08 16:12:32 2012 +1000
+@@ -79,7 +79,7 @@
+  *
+  * Returns number of starting points in list.
+  */
+-extern S_POINT *get_starts(
++S_POINT *get_starts(
+   DATASET *dataset,  ///< the dataset
+   MODEL *model,      ///< the model
+   char *e_cons,      ///< encoded consensus sequence
+@@ -127,6 +127,8 @@
+ 
+   // Free memory associated with the sp_matrix, as we no longer need it:
+   free_sp_matrix(sp_matrix);
++  free(central_ns);
++  free(central_ws);
+ 
+   return s_points;
+ } // get_starts
+@@ -156,7 +158,7 @@
+ ) {
+   assert (max_width >= min_width); // Precondition
+ 
+-  int curr_width;
++  int curr_width, inc_width;
+   int *progression = NULL;
+   *n_vals = 0;
+ 
+diff -r 59ed92581a34 -r b2c55b0470c4 src/subseq7.c
+--- a/src/subseq7.c	Tue Mar 06 09:43:43 2012 +1000
++++ b/src/subseq7.c	Thu Mar 08 16:12:32 2012 +1000
+@@ -102,7 +102,7 @@
+         This has not yet been done because "if it ain't broke, don't fix it".
+ */
+ /**********************************************************************/
+-extern void subseq7(
++void subseq7(
+   MODEL *model,			// the model
+   DATASET *dataset,		/* the dataset */
+   int w,			// w to use
+@@ -398,7 +398,7 @@
+ 	For the tcm model, all non-overlapping local maxima are found.
+ */
+ /**********************************************************************/
+-extern int get_max(
++int get_max(
+   MOTYPE mtype,		/* the model type */
+   DATASET *dataset,	/* the dataset */
+   int w,		/* width of sites */ 
+@@ -551,7 +551,7 @@
+         if the first pY is <, =, > the first pY.
+ */
+ /**********************************************************************/
+-extern int pY_compare(
++int pY_compare(
+   const void *v1, 
+   const void *v2 
+ )
+@@ -771,7 +771,7 @@
+ 	Returns number of values of nsites0 tried.
+ */ 
+ /**********************************************************************/
+-extern int align_top_subsequences(
++int align_top_subsequences(
+   MOTYPE mtype,				/* type of model */
+   int w,				/* width of motif */
+   DATASET *dataset,			/* the dataset */
+diff -r 59ed92581a34 -r b2c55b0470c4 src/subst-matrix.c
+--- a/src/subst-matrix.c	Tue Mar 06 09:43:43 2012 +1000
++++ b/src/subst-matrix.c	Thu Mar 08 16:12:32 2012 +1000
+@@ -156,7 +156,7 @@
+ */
+ /**********************************************************************/
+ 
+-extern MATRIX_T* gen_pam_matrix(
++MATRIX_T* gen_pam_matrix(
+   ALPH_T alph,                  /* alphabet */
+   int dist,			/* PAM distance */
+   BOOLEAN_T logodds		/* true: generate log-odds matrix 
+diff -r 25963a151bde -r 76a9f3473e77 website/cgi-bin/meme.pl
+--- a/website/cgi-bin/meme.pl	Fri Mar 23 18:49:52 2012 -0700
++++ b/website/cgi-bin/meme.pl	Mon Mar 26 09:24:50 2012 +1000
+@@ -196,7 +196,6 @@
+   # optional right fields: bfile, shuffle, dna-only: strand, pal, PSP
+ 
+   my $opt_right .= qq {
+-<font style="background-color: yellow">NEW</font>
+ Perform <A HREF="../help_psp.html#discriminative"><B>discriminative</B></A>
+ motif discovery &ndash; Enter the name of a file containing
+ &lsquo;<A HREF="../help_psp.html#negativeset"><B>negative sequences</B>&rsquo;</A>:
+diff -r 76a9f3473e77 -r af274e59cb61 etc/centrimo_template.html
+--- a/etc/centrimo_template.html	Mon Mar 26 09:24:50 2012 +1000
++++ b/etc/centrimo_template.html	Mon Mar 26 11:35:11 2012 +1000
+@@ -22,7 +22,8 @@
+       <b>best</b> site of a given motif occuring at a given position in the
+       input sequences.  This probability is based only on sequences that
+       contain at least one site with score greater than the score threshold 
+-      (<script>document.write(data['options']['score'])</script> bits).</p>
++      (<span id="ins_score1"></span> bits).</p>
++      <script>$("ins_score1").innerHTML = data['options']['score'];</script>
+       <p>Points (X,Y) on the plot are:<br>
+       &nbsp;&nbsp;Y = Pr(best site occurs at position X | sequence contains a site)</p>
+       <p><b>Note:</b> The plots are smoothed according to the function 
+@@ -142,7 +143,8 @@
+     </div>
+     <div class="pop_content" id="pop_total_sites">
+       <p>The number of sequences containing a match to the motif above the given score threshold
+-      (<script>document.write(data['options']['score'])</script> bits).</p>
++      (<span id="ins_score2"></span> bits).</p>
++      <script>$("ins_score2").innerHTML = data['options']['score'];</script>
+       <div style="float:right; bottom:0px;">[ 
+         <a href="javascript:help_popup()">close</a> ]</div>
+     </div>
+@@ -155,7 +157,8 @@
+     </div>
+     <!-- Page starts here -->
+     <div id="top" class="pad1">
+-      <h1><img src="http://vm2.ucsd.edu:8080/meme/doc/images/centrimo_logo.png" alt="CentriMo" /></h1>
++      <h1><img id="title_img" src="" alt="CentriMo" /></h1>
++      <script>$("title_img").src = site_url + "/doc/images/centrimo_logo.png"</script>
+       <p>
+         For further information on how to interpret these results or to get a 
+         copy of the MEME software please access 
+@@ -180,29 +183,40 @@
+     </div>
+     <!-- alert the user when their browser is not up to the task -->
+     <noscript><h1 style="color:red">Javascript is required to view these results!</h1></noscript>
++    <h1 id="html5_warning" style="color:red; display:none;">Your browser does not support canvas!</h1>
+     <script>
+-      if (!window.HTMLCanvasElement)
+-        document.write("<h1 style=\"color:red\">Your browser does not support canvas!</h1>\n");
++      if (!window.HTMLCanvasElement) $("html5_warning").style.display = "block";
+     </script>
+     <h2 class="mainh pad2">Results</h2>
+     <div class="box">
++      <span id="ins_desc"></span>
+       <!-- write out the job description -->
+       <script>
+         if (data['job_description']) {
+-          document.write('<h4 id="description">Description</h4>\n');
++          var node = $("ins_desc");
++          while (node.firstChild) node.removeChild(node.firstChild);
++          var header = document.createElement("h4");
++          header.id = "description";
++          header.appendChild(document.createTextNode("Description"));
++          node.appendChild(header);
+           var paragraphs = data['job_description'].split("\n\n");
+           for (var i = 0; i < paragraphs.length; i++) {
+-            document.write('<p>');
+-            document.write(paragraphs[i].split("\n").join('<br>'));
+-            document.write('</p>\n');
++            var p = document.createElement("p");
++            var lines = paragraphs[i].split("\n");
++            for (var j = 0; j < lines.length; j++) {
++              if (j != 0) p.appendChild(document.createElement('br'));
++              p.appendChild(document.createTextNode(lines[j]));
++            }
++            node.appendChild(p);
+           }
+         }
+       </script>
+       <div>
+         <div style="float:left; width:70%">
+-          <h4 id="graph_sec">Motif Probability Graph (score &ge; 
+-            <script>document.write(data['options']['score']);</script> 
+-            bits)&nbsp;<div class="help" onclick="help_popup(this, 'pop_prob_graph')"></div></h4>
++          <h4 id="graph_sec">Motif Probability Graph (score &ge; <span 
++              id="ins_score3"></span> bits)&nbsp;<div class="help" 
++              onclick="help_popup(this, 'pop_prob_graph')"></div></h4>
++          <script>$("ins_score3").innerHTML = data['options']['score'];</script>
+           <canvas id="graph" width="700" height="400" onclick="move_legend(event)"></canvas>
+         </div>
+         <div class="graph_options_section">
+@@ -237,9 +251,8 @@
+             </select>
+           </div>
+           <div style="margin-top:10px;"> 
+-            <script>
+-              document.write("<form method='post' action='" + site_url + "/cgi-bin/echo.cgi'>");
+-            </script>
++            <form id="eps_form" method="post" action="">
++              <script>$("eps_form").action = site_url + "/cgi-bin/echo.cgi";</script>
+               <input type="hidden" name="name" value="centrimo.eps">
+               <input type="hidden" name="mime_type" value="application/postscript">
+               <input type="hidden" id="eps_content" name="content" value="">
+@@ -314,10 +327,11 @@
+                 >Database is</label>
+               <select id="filter_db" disabled>
+                 <script>
++                  var filter_db = $("filter_db");
++                  filter_db.options.length = 0;
+                   for (var i = 0; i < data['motif_dbs'].length; i++) {
+                     var db = data['motif_dbs'][i];
+-                    document.write("<option value=\"" + i + "\">" + 
+-                        db['name'] + "</option>\n");
++                    filter_db.add(new Option(db['name'], i));
+                   }
+                 </script> 
+               </select>
+@@ -403,40 +417,54 @@
+       <table class="inputs">
+         <tr><th>Database</th><th>Source</th><th>Sequence Count</th></tr>
+         <tr>
+-          <script>
+-          {
+-            var db = data['sequence_db'];
+-            document.write("<td>"  + db['name'] + "</td>");
+-            document.write("<td>" + db['source'] + "</td>");
+-            document.write("<td>" + db['count'] + "</td>");
+-          }
+-          </script>
++          <td id="ins_seq_name"></td>
++          <td id="ins_seq_source"></td>
++          <td id="ins_seq_count"></td>
+         </tr>
+       </table>
++      <script>
++      {
++        var db = data['sequence_db'];
++        $("ins_seq_name").innerHTML = db['name'];
++        $("ins_seq_source").innerHTML = db['source'];
++        $("ins_seq_count").innerHTML = db['count'];
++      }
++      </script>
+       <h4>Motifs</h4>
+-      <table class="inputs">
+-        <tr><th>Database</th><th>Source</th><th>Motif Count</th></tr>
+-        <script>
+-        {
+-          var motif_dbs = data['motif_dbs'];
+-          for (var i = 0; i < motif_dbs.length; i++) {
+-            var db = motif_dbs[i];
+-            document.write("<tr>");
+-            document.write("<td>"  + db['name'] + "</td>");
+-            document.write("<td>" + db['source'] + "</td>");
+-            document.write("<td>" + db['count'] + "</td>");
+-            document.write("</tr>");
+-          }
++      <table id="motif_dbs" class="inputs">
++        <thead>
++          <tr><th>Database</th><th>Source</th><th>Motif Count</th></tr>
++        </thead>
++        <tbody></tbody>
++      </table>
++      <script>
++      {
++        var tbl = $('motif_dbs');
++        var tbody = tbl.tBodies[0];
++        while (tbody.rows.length > 0) {
++          tbody.deleteRow(0);
+         }
+-        </script>
+-      </table>
++        var motif_dbs = data['motif_dbs'];
++        for (var i = 0; i < motif_dbs.length; i++) {
++          var db = motif_dbs[i];
++          var row = tbody.insertRow(tbody.rows.length);
++          add_text_cell(row, db['name']);
++          add_text_cell(row, db['source']);
++          add_text_cell(row, db['count']);
++        }
++      }
++      </script>
+     </div>
+     <div id="info_sec" class="bar">
+       <div class="subsection">
+         <a name="version"/>
+         <h5>CentriMo version</h5>
+-        <script>document.write(data["version"]);</script> 
+-        (Release date: <script>document.write(data["release"]);</script>)
++        <span id="ins_version"></span>
++        (Release date: <span id="ins_release"></span>)
++        <script>
++          $("ins_version").innerHTML = data["version"];
++          $("ins_release").innerHTML = data["release"];
++        </script> 
+       </div>
+       <div class="subsection">
+         <a name="reference"/>
+diff -r 796d45191383 -r 8768361d0c86 scripts/dreme.py.in
+--- a/scripts/dreme.py.in	Mon Mar 26 18:35:16 2012 -0700
++++ b/scripts/dreme.py.in	Mon Apr 02 10:42:16 2012 +1000
+@@ -228,7 +228,7 @@
+             print >> sys.stderr, ("Failed to create PNG file. "
+                     "Have you got ghostscript installed?")
+ 
+-# gets the version of the ghostscript version
++# gets the version of the ghostscript program
+ _gs_version = []
+ def gs_version():
+     global _gs_version
+@@ -249,12 +249,12 @@
+             _gs_version = [-1]
+     return _gs_version
+ 
+-# returns if a version of ghostscript more modern than 9
++# returns if a version of ghostscript more modern than 8.15
+ def gs_ok():
+     ver = gs_version()
+     if ver[0] > 8:
+         return True
+-    return len(ver) > 1 and ver[1] > 15
++    return ver[0] == 8 and len(ver) > 1 and ver[1] > 15
+     
+ 
+ # get array of int zeros (numpy is not standard)
+diff -r 912467618292 -r 219a06b1d49a src/background.c
+--- a/src/background.c	Fri Apr 06 12:56:01 2012 -0700
++++ b/src/background.c	Tue Apr 10 18:36:42 2012 +1000
+@@ -65,7 +65,8 @@
+  
+ static double *get_cond_prob (
+   double *a_p, 					/* tuple->prob array */
+-  int n						/* length of array */
++  int n,					/* length of array */
++  BOOLEAN add_x					/* alphabet contains X */
+ );
+ 
+ /***************************************************************************/
+@@ -105,7 +106,7 @@
+   double a_p[MAX_BACK_SIZE];			/* tuple-prob array */
+   double *a_cp; 				/* conditional prob. array */
+   FILE *pfilep;					/* file pointer to file */
+-  char *line;				/* line buffer */
++  char *line;					/* line buffer */
+   char **fields;				/* fields of line */
+   int nfields;					/* number of fields in line */
+   int line_no = 0;				/* line number */
+@@ -208,10 +209,15 @@
+ 
+   /* get conditional probabilities */
+   for (i=1, ntuples=0; i<=maxw; i++) ntuples+= pow(alen, i);
+-  a_cp = get_cond_prob(a_p, ntuples);
++#ifdef DEBUG
++  printf("tuple probs:\n");
++  print_prob(a_p, maxw, "", 0, alpha);
++#endif
++  a_cp = get_cond_prob(a_p, ntuples, add_x);
+ 
+   /* print the probabilities */
+ #ifdef DEBUG
++  printf("conditional probs:\n");
+   print_prob(a_cp, maxw, "", 0, alpha);
+ #endif
+ 
+@@ -299,7 +305,7 @@
+   //print_prob(a_p, maxw, "", 0, alpha);
+ 
+   /* get conditional probabilities */
+-  double *a_cp = get_cond_prob(a_p, ntuples);
++  double *a_cp = get_cond_prob(a_p, ntuples, FALSE);
+ 
+   //print_prob(a_cp, maxw, "", 0, alpha);
+ 
+@@ -487,10 +493,13 @@
+ /***************************************************************************/
+ static double *get_cond_prob (
+   double *a_p, 					/* tuple->prob array */
+-  int n						/* length of array */
++  int n,					/* length of array */
++  BOOLEAN add_x					/* alphabet contains X */
+ )
+ {
+   double *a_cp=NULL;
++  // ignore last letter (X) if present
++  int index_alen_m1 = add_x ? index_alen-1 : index_alen;
+ 
+   Resize(a_cp, n, double);			/* create array */
+   
+@@ -503,7 +512,8 @@
+       // get the total probability of this prefix summed over all suffixes
+       if (wa % index_alen == 0) {		
+         int j;
+-        for (j=0, total_w_prob=0; j<index_alen-1; j++) {	// ignore last letter (X)
++        // ignore last letter (X) if present
++        for (j=0, total_w_prob=0; j<index_alen_m1; j++) {	
+           total_w_prob += a_p[wa+j];
+         }
+       }
+diff -r 219a06b1d49a -r 495adf09b40a doc/centrimo.html
+--- a/doc/centrimo.html	Tue Apr 10 18:36:42 2012 +1000
++++ b/doc/centrimo.html	Wed Apr 11 13:50:04 2012 +1000
+@@ -113,10 +113,10 @@
+         <td>Scans with the reverse complement motif.</td>
+       </tr>
+       <tr>
+-        <td>--noflip</td> 
++        <td>--flip</td> 
+         <td>&nbsp;</td>   
++        <td>reverse complement matches appear 'reflected' around sequence centers</td>
+         <td>do not 'flip' the sequence; use rc of motif instead.</td>
+-        <td>reverse complement matches appear 'reflected' around sequence centers</td>
+       </tr>
+       <tr>
+         <th colspan="4">Output filtering</th>
+diff -r 219a06b1d49a -r 495adf09b40a etc/centrimo_template.html
+--- a/etc/centrimo_template.html	Tue Apr 10 18:36:42 2012 +1000
++++ b/etc/centrimo_template.html	Wed Apr 11 13:50:04 2012 +1000
+@@ -264,7 +264,7 @@
+       <div>
+         <div style="float:left; width:70%">
+           <h4 id="data_sec">Centrally Enriched Motifs</h4>
+-          <table class="motifs hide_db hide_maxprob hide_tsites" id="motifs">
++          <table class="motifs hide_db hide_maxprob" id="motifs">
+             <thead>
+             <tr>
+               <th class="deselect" onclick="clear_selection()" 
+@@ -399,7 +399,7 @@
+           </div>
+           <div >
+             <input type="checkbox" id="show_tsites" value="1" 
+-            onclick="toggle_column('hide_tsites')">
++            onclick="toggle_column('hide_tsites')" checked>
+             <label for="show_tsites">Show Total Sites</label>
+           </div>
+           <div >
+diff -r 219a06b1d49a -r 495adf09b40a src/centrimo.c
+--- a/src/centrimo.c	Tue Apr 10 18:36:42 2012 +1000
++++ b/src/centrimo.c	Wed Apr 11 13:50:04 2012 +1000
+@@ -65,8 +65,9 @@
+   "     --maxbin <width>         maximum width of the central region (bin) to\n"
+   "                               consider; default: use the sequence length\n"
+   "     --norc                   do not scan with the reverse complement motif\n"
+-  "     --noflip                 do not 'flip' the sequence; use rc of motif instead;\n"
+-  "                               default: rc matches appear 'reflected' around center\n"
++  "     --flip                   allow 'fliping' of sequences causing rc matches\n"
++  "                               to appear 'reflected' around center;\n"
++  "                               default: do not flip sequences\n"
+   "     --desc <description>     include the description in the output;\n"
+   "                               default: no description\n"
+   "     --dfile <desc file>      use the file content as the description;\n"
+@@ -190,7 +191,7 @@
+ ) {
+ 
+   // Define command line options.
+-  const int num_options = 12;
++  const int num_options = 13;
+   cmdoption const centrimo_options[] = {
+     {"bgfile", REQUIRED_VALUE},
+     {"o", REQUIRED_VALUE},
+@@ -200,6 +201,7 @@
+     {"ethresh", REQUIRED_VALUE},
+     {"maxbin", REQUIRED_VALUE},
+     {"norc", NO_VALUE},
++    {"flip", NO_VALUE},
+     {"noflip", NO_VALUE},
+     {"desc", REQUIRED_VALUE},
+     {"dfile", REQUIRED_VALUE},
+@@ -213,7 +215,7 @@
+   options->alphabet = DNA_ALPH;
+   options->allow_clobber = TRUE;
+   options->scan_both_strands = TRUE;
+-  options->no_flip = FALSE;
++  options->no_flip = TRUE;
+ 
+   options->description = NULL;
+   options->desc_file = NULL;
+@@ -276,8 +278,13 @@
+     else if (strcmp(option_name, "norc") == 0){
+       options->scan_both_strands = FALSE;
+     }
+-    else if (strcmp(option_name, "noflip") == 0){
+-      options->no_flip = TRUE;
++    else if (strcmp(option_name, "flip") == 0) {
++      options->no_flip = FALSE; 
++    }
++    else if (strcmp(option_name, "noflip") == 0) {
++      // this is default now, just leaving this
++      // to avoid error messages with people
++      // running old commands
+     }
+     else if (strcmp(option_name, "o") == 0){
+       // Set output directory with no clobber
+diff -r e32e7ace9ff6 -r 649746c87e11 etc/meme-to-html.xsl
+--- a/etc/meme-to-html.xsl	Mon Apr 16 18:03:37 2012 -0700
++++ b/etc/meme-to-html.xsl	Tue Apr 17 12:36:30 2012 +1000
+@@ -783,7 +783,7 @@
+               <xsl:if test="/MEME/model/strands='both'">
+                 <td class="strand_side"><xsl:if test="@strand='plus'">+</xsl:if><xsl:if test="@strand='minus'">-</xsl:if></td>
+               </xsl:if>
+-              <td class="strand_start"><xsl:value-of select="@position"/></td>
++              <td class="strand_start"><xsl:value-of select="@position + 1"/></td>
+               <td class="strand_pvalue"><xsl:value-of select="@pvalue"/></td>
+               <td class="strand_lflank"><xsl:value-of select="left_flank"/></td>
+               <td class="strand_seq">
+diff -r 02c88ea9dffa -r a1f63c4bfe3f scripts/prior_utils.pl
+--- a/scripts/prior_utils.pl	Tue Feb 28 17:59:26 2012 +1000
++++ b/scripts/prior_utils.pl	Wed Apr 25 22:07:41 2012 +0200
+@@ -558,13 +558,20 @@
+       $pos_dictionary,  # ref to hash count positive seqs where each w-mer seen
+       $neg_dictionary,  # ref to hash count negative seqs where each w-mer seen
+       $triples,         # if defined score spaced triples rather than w-mers
+-      $alternates       # if defined dictionary of alternatives for given character
++      $alternates,      # if defined dictionary of alternatives for given character
++      $ambigs           # ambiguous characters: count any word containing these once
+   ) = @_;
+ 
+     # count the number of times each w-mer occurs first in the positive
+     # then in the negative sequences
+     &count_all_w_mers($pos_sequences, $revcomp, $width, $pos_dictionary, $triples, $alternates);
++#    print STDERR "pos counts including ambigs: ".Dumper(\$pos_dictionary);
++    &uncount_ambigs  ($pos_dictionary, $ambigs, $revcomp);
++#    print STDERR "pos counts excluding ambigs: ".Dumper(\$pos_dictionary);
+     &count_all_w_mers($neg_sequences, $revcomp, $width, $neg_dictionary, $triples, $alternates);
++#    print STDERR "neg counts including ambigs: ".Dumper(\$neg_dictionary);
++    &uncount_ambigs  ($neg_dictionary, $ambigs, $revcomp);
++#    print STDERR "neg counts excluding ambigs: ".Dumper(\$neg_dictionary);
+ } # D_prior
+ 
+ 
+@@ -701,6 +708,45 @@
+     return \%prior_values;
+ }
+ 
++
++################################################################################
++# uncount_ambigs
++#
++# find each word that contains letters in the ambigous set and set its count
++# to 1, so it gets the lowest score possible for any word encountered (not strictly
++# true as we should give it the highest possible count in the negative set for that
++# to be literally true).
++# input:  $ambigs: letters in the ambiguous set (string)
++#          $revcomp: undef if reverse complement not required, any other
++#          value otherwise
++# output: $dictionary: reference to hash indexed on w-mer, with entries
++#          each also a hash containing values indexed on "count" (count
++#          of that w-mer) and "last" (index of previous place w-mer seen)
++# NOTE: reverse_complement doesn't correctly reverse ambiguous letters but presence
++# of any one of these should make the count go to 1 so it doesn't matter
++#
++################################################################################
++
++sub uncount_ambigs {
++  my ($dictionary,    # count of sequences where each w-mer seen
++      $ambigs,        # srting of ambiguous characters
++      $revcomp        # if defined fix both strands
++  ) = @_;
++  my $ambigsset = "[".$ambigs."]";
++  foreach my $word (keys %$dictionary) {
++    if ($word =~ /$ambigsset/) {
++      $dictionary->{$word}->{"count"} = 1;
++      if (defined($revcomp)) {
++        my $reverse = &reverse_complement($word);
++        if (exists ($dictionary->{$reverse})) {
++           $dictionary->{$reverse}->{"count"} = 1;
++        }
++      }
++    }
++  }
++}
++
++
+ ################################################################################
+ #
+ #  count_all_w_mers
+@@ -1134,6 +1180,7 @@
+ 
+   my $L_wP1 = length($seq) - $width + 1; # L-w+1
+   my ($pseudocount_enum, $pseudocount_denom) = (1, 1 + $N_neg/$N_pos);
++  my $ambigsset = "[".$ambigs."]";
+   for (my $j = 0; $j < $L_wP1 ; $j++) {
+     my $w_mer = substr($seq, $j, $width);
+     my @letters = split(//,$w_mer);
+@@ -1158,9 +1205,7 @@
+         my $k = $width-1;
+             for (my $j = $i+1; $j < $width-1; $j++) {
+                     my $key = ($j-$i).",".($k-$i).":$letters[$i].$letters[$j].$letters[$k]";
+-                    if ($ambigs && $key =~ /$ambigs/) {
+-                        $score = 0;
+-                    } elsif (exists($pos_dictionary->{$key}) && exists($$score_cache{$key})) {
++                    if (exists($pos_dictionary->{$key}) && exists($$score_cache{$key})) {
+                         $score = $$score_cache{$key};
+                     } else {
+                         my $pos_total =
+@@ -1179,14 +1224,10 @@
+                 }
+         $score = $w_mer_max_score;
+     } else {
+-        if ($ambigs && $w_mer =~ /$ambigs/) {
+-            $score = 0;
+-        } else {
+-            my $pos_total = (exists($pos_dictionary->{$w_mer})?$pos_dictionary->{$w_mer}{"count"}:0);
+-            my $neg_total = (exists($neg_dictionary->{$w_mer})?$neg_dictionary->{$w_mer}{"count"}:0);
+-            # add pseudocounts to the pos_total / ($pos_total + $neg_total) score here
+-            $score =  ($pos_total + $pseudocount_enum) / ($pos_total + $neg_total + $pseudocount_denom);
+-        }
++        my $pos_total = (exists($pos_dictionary->{$w_mer})?$pos_dictionary->{$w_mer}{"count"}:0);
++        my $neg_total = (exists($neg_dictionary->{$w_mer})?$neg_dictionary->{$w_mer}{"count"}:0);
++        # add pseudocounts to the pos_total / ($pos_total + $neg_total) score here
++        $score =  ($pos_total + $pseudocount_enum) / ($pos_total + $neg_total + $pseudocount_denom);
+     }
+     if (1) { #defined ($scale)
+       if ((! defined($$min_score)) || $score < $$min_score) {
+diff -r 02c88ea9dffa -r a1f63c4bfe3f scripts/psp-gen.pl.in
+--- a/scripts/psp-gen.pl.in	Tue Feb 28 17:59:26 2012 +1000
++++ b/scripts/psp-gen.pl.in	Wed Apr 25 22:07:41 2012 +0200
+@@ -2,12 +2,21 @@
+ # AUTHOR: Philip Machanick
+ # CREATE DATE: 23 July 2009
+ 
++
++################################################################################
++#
+ # Calculate discriminative prior based on Hartemink idea
+ # in format for use with MEME
+ # options (currently inactive) for other prior formats
+-
++# FIXME: only corrected count of ambigous letters for D_prior calculation
++# -- if activating any of the others check this plus in general check they\
++# -- are up to date with the D_priors approach
++#
+ # input: positive set (X) and negative set (Y) as FASTA file
+ # outout: stdout
++#
++#################################################################################
++
+ 
+ use Scalar::Util qw(looks_like_number);
+ use strict;
+@@ -70,8 +79,6 @@
+                     treated as equivalent in searches; sets
+                     may not overlap
+                     default: no letters treated as equivalent
+-     -arbitraryOK   allow N in DNA or X in protein
+-                    default: do not allow N or X
+      -revcomp       count reverse complements in computing scores
+                     default: only count forward matches
+      -scalemin <number>
+@@ -121,7 +128,7 @@
+ 
+ my ($pos_filename, $neg_filename);
+ my ($priortype, $d_prior, $d_hyper_prior, $hypergeomtric_prior, $hamming_prior,
+-   $revcomp, $absolute, $maxrange, $raw, $report, $NorX, $triples, $fixed_start, $equivs);
++   $revcomp, $absolute, $maxrange, $raw, $report, $ambigs, $triples, $fixed_start, $equivs);
+ my $verbose; # define to get stats out
+ # get input arguments
+ my $alpha_choice;
+@@ -153,8 +160,6 @@
+   } elsif ($_ eq "-equiv") {
+     $equivs = shift;
+     &print_usage("$usage", 1) unless $equivs;
+-  } elsif ($_ eq "-arbitraryOK") {
+-    $NorX = "";
+   } elsif ($_ eq "-triples") {
+     $triples = 1;
+   } elsif ($_ eq "-fixedstart") {
+@@ -224,13 +229,10 @@
+ 
+ $alpha_choice = "DNA" unless (defined ($alpha_choice));
+ my %alternates;
+-my $ambigs;
+-if (defined ($NorX)) { 
+-    $NorX .= $alpha_choice eq "DNA"?"N":"BJZX";
+-    $ambigs = '['.$NorX.']';
+-} else {
+-    $NorX = "";
+-}
++$ambigs .= $alpha_choice eq "DNA"?"WSMKRYBDHVN":"BJZX";
++# FIXME: to do this properly will blow up the number of options###############
++# for a word exponentially so easiest if we treat ambigs as if they###########
++# don't count, score them as if they occur once
+ # FIXME: ############# NOT IMPLEMENTED YET
+ # FIXME: should also do alternates for DNA
+ # FIXME: actual matches score 0 for any word or triple containing an ambig
+@@ -271,9 +273,9 @@
+ # when file is read, if equivalent sets specified, the returned sequences are translated to
+ # render all the alternatives as one of the equivalent letters
+ # read positive file storing names and FASTA comments and returning total sequence length
+-&read_seq_file ($pos_filename, \@pos_sequences, \$L_pos, $ALPHABET.$NorX, \@translations, $verbose);
++&read_seq_file ($pos_filename, \@pos_sequences, \$L_pos, $ALPHABET.$ambigs, \@translations, $verbose);
+ # read negative file the same way
+-&read_seq_file ($neg_filename, \@neg_sequences, \$L_neg, $ALPHABET.$NorX, \@translations, $verbose);
++&read_seq_file ($neg_filename, \@neg_sequences, \$L_neg, $ALPHABET.$ambigs, \@translations, $verbose);
+ 
+ my $N_pos  = @pos_sequences;
+ my $N_neg  = @neg_sequences;
+@@ -312,7 +314,7 @@
+     my ($min_score, $max_score) = (1, 0);
+     if ($d_prior || $d_hyper_prior) {
+         &D_prior(\@pos_sequences, \@neg_sequences, $revcomp, $width,
+-            \%pos_dictionary, \%neg_dictionary, $triples, \%alternates);
++            \%pos_dictionary, \%neg_dictionary, $triples, \%alternates, $ambigs);
+     } elsif ($hypergeomtric_prior) {    # don't normalize for seq length
+         &class_prior_norm(\@pos_sequences, \@neg_sequences, $revcomp, $width, undef,
+             \%pos_dictionary, \%neg_dictionary);
+diff -r a1f63c4bfe3f -r cb74543214b8 doc/psp-gen.xml
+--- a/doc/psp-gen.xml	Wed Apr 25 22:07:41 2012 +0200
++++ b/doc/psp-gen.xml	Thu Apr 26 12:49:13 2012 +0200
+@@ -136,12 +136,6 @@
+ </li>
+ 
+ <li>
+-<code>-arbitraryOK</code> &#8211; Allow ambiguous letters (but score any
+-sites containing them as zero).<br />
+-Default: do not allow ambiguous letters.
+-</li>
+-
+-<li>
+ <code>-revcomp</code> &#8211; DNA only: score both strands.<br />
+ Default: only score on one strand.
+ </li>
+@@ -537,7 +531,10 @@
+ 
+ <ul>
+ <li>
+-Ambiguous letters cause words or triples containing them to be scored as zero.
++Any letters in sequence represening ambiguous bases result in a word
++(<i>w</i>-mer) containing that word (or triple in the case of protein)
++being counted whether in the positive or negative sets as if it
++occurred once.
+ </li>
+ </ul>
+ 
+diff -r a1f63c4bfe3f -r cb74543214b8 scripts/prior_utils.pl
+--- a/scripts/prior_utils.pl	Wed Apr 25 22:07:41 2012 +0200
++++ b/scripts/prior_utils.pl	Thu Apr 26 12:49:13 2012 +0200
+@@ -1380,13 +1380,24 @@
+ #  reverse_complement
+ #
+ #  return reverse complement of DNA string: assumes from right alphabet
+-#  and all in caps (any other letters reversed without translation).
++#  and all in caps.
++#
++#  IUPAC extended alphabet:
++#    W=A|T, S=C|G, N=all not translated
++#    M=A|C   => T|G=K
++#    K=T|G   => A|C=M
++#    R=A|G   => T|C=Y
++#    Y=C|T   => G|A=R
++#    B=C|G|T => G|C|A=V
++#    D=A|G|T => T|C|A=H
++#    H=A|C|T => T|G|A=D
++#    V=A|C|G => T|G|C=B
+ #
+ ################################################################################
+ 
+ sub reverse_complement {
+   ($_) = @_;
+-  tr/ACGT/TGCA/;
++  tr/ACGTMKRYBDHV/TGCAKMYRVHDB/;
+   $_ = reverse;
+   return $_;
+ }
+diff -r a1f63c4bfe3f -r cb74543214b8 website/html/help_psp.html
+--- a/website/html/help_psp.html	Wed Apr 25 22:07:41 2012 +0200
++++ b/website/html/help_psp.html	Thu Apr 26 12:49:13 2012 +0200
+@@ -77,7 +77,7 @@
+ 		<br><br><br>
+ 	      If we find any ambiguous letters in a <i>w</i>-mer
+ 	      (e.g. <code>N</code>, which stands for any base in
+-	      DNA), we score that <i>w</i>-mer as zero.
++	      DNA), we count any such <i>w</i>-mer as if it occurs once.
+ 	      <br><br> 
+ 	      For protein sequences, instead of requiring an exact
+ 	      match of a <i>w</i>-wide subsequence, we break the
+@@ -91,7 +91,9 @@
+ 	      peaks in the PSP. Once we have calculated scores, we
+ 	      scale them to lie between 0.1 and 0.9 inclusive. We
+ 	      convert the scaled scores to probabilities to complete
+-	      the calculation of the PSP.<br>
++	      the calculation of the PSP. As with DNA sequences, we
++	      treat any triple containing an ambiguous symbol as if it
++	      only occurs once.<br>
+               <br>More detail follows.<br><hr>
+ 	      <ul>
+ 		<li style="list-style: none"><a name= "psp"></a></li>
+diff -r 092bd08022c6 -r fa6cce59e767 doc/options.xsl
+--- a/doc/options.xsl	Wed May 02 15:06:01 2012 -0700
++++ b/doc/options.xsl	Fri May 04 22:03:45 2012 -0700
+@@ -490,17 +490,15 @@
+     will determine the effective output filter.
+   </xsl:template>
+ 
+-  <xsl:template match="command-option[@name='output-pthresh']">
++ <xsl:template match="command-option[@name='output-pthresh']">
+     <code>--output-pthresh <i>&lt;float&gt;</i></code>
+     - The p-value threshold for displaying search results.
+     If the p-value of a match is greater than this value,
+     then the match will not be printed. 
+-    By default, a p-value threshold is not used.
+-    If any combination of <code>--output-ethresh</code>, 
+-    <code>--output-pthresh</code>,
+-    or <code>--output-qthresh</code> is given,
+-    whichever option occurs last on the command line
+-    will determine the effective output filter.
++    If both the <code>--output-pthresh</code> and <code>--output-qthresh</code>
++    options appear on the command line, whichever appears later
++    on the command line will be applied.
++    The default p-value threshold is 1e-4.
+   </xsl:template>
+ 
+   <xsl:template match="command-option[@name='output-qthresh']">
+@@ -508,12 +506,7 @@
+     - The q-value threshold for displaying search results.
+     If the q-value of a match is greater than this value,
+     then the match will not be printed.
+-    By default, a q-value threshold is not used.
+-    If any combination of <code>--output-ethresh</code>, 
+-    <code>--output-pthresh</code>,
+-    or <code>--output-qthresh</code> is given,
+-    whichever option occurs last on the command line
+-    will determine the effective output filter.
++    By default, no q-value threshold is applied.
+   </xsl:template>
+ 
+   <xsl:template match="command-option[@name='p-score']">
+diff -r 092bd08022c6 -r fa6cce59e767 src/fimo.c
+--- a/src/fimo.c	Wed May 02 15:06:01 2012 -0700
++++ b/src/fimo.c	Fri May 04 22:03:45 2012 -0700
+@@ -176,8 +176,8 @@
+     "     --norc\n"
+     "     --o <output dir> (default=fimo_out)\n"
+     "     --oc <output dir> (default=fimo_out)\n"
+-    "     --output-pthresh <float> (default 1e-4)\n"
+-    "     --output-qthresh <float> (default 1.0)\n"
++    "     --output-pthresh <float> (default = 1e-4)\n"
++    "     --output-qthresh <float> (default = no threshold)\n"
+     "     --no-qvalue\n"
+     "     --psp <PSP filename> (default none)\n"
+     "     --prior-dist <PSP distribution filename> (default none)\n"
+diff -r 092bd08022c6 -r b20a9fa4568a src/centrimo.c
+--- a/src/centrimo.c	Wed May 02 15:06:01 2012 -0700
++++ b/src/centrimo.c	Tue May 08 16:31:22 2012 +1000
+@@ -191,12 +191,13 @@
+ ) {
+ 
+   // Define command line options.
+-  const int num_options = 13;
++  const int num_options = 14;
+   cmdoption const centrimo_options[] = {
+     {"bgfile", REQUIRED_VALUE},
+     {"o", REQUIRED_VALUE},
+     {"oc", REQUIRED_VALUE},
+     {"score", REQUIRED_VALUE},
++    {"motif", REQUIRED_VALUE},
+     {"motif-pseudo", REQUIRED_VALUE},
+     {"ethresh", REQUIRED_VALUE},
+     {"maxbin", REQUIRED_VALUE},
+diff -r 24619a92bce9 -r 2c18ee5e1d26 etc/centrimo_template.js
+--- a/etc/centrimo_template.js	Wed May 30 00:41:54 2012 -0700
++++ b/etc/centrimo_template.js	Fri Jun 08 11:56:30 2012 +1000
+@@ -673,8 +673,8 @@
+ function make_link(text, url) {
+   var textNode = null;
+   var link = null;
+-  if (text) textNode = document.createTextNode(text);
+-  if (url) {
++  if (typeof text !== "undefined" && text !== null) textNode = document.createTextNode(text);
++  if (typeof url === "string") {
+     if (url.indexOf("//") == -1) {
+       url = "http://" + url;
+     }
+@@ -707,7 +707,7 @@
+ function add_cell(row, node, cls) {
+   var cell = row.insertCell(row.cells.length);
+   if (node) cell.appendChild(node);
+-  if (cls) cell.className = cls;
++  if (typeof cls === "string") cell.className = cls;
+ }
+ 
+ /*
+@@ -717,7 +717,7 @@
+  */
+ function add_text_cell(row, text, cls) {
+   var node = null;
+-  if (text) node = document.createTextNode(text);
++  if (typeof text !== "undefined" && text !== null) node = document.createTextNode(text);
+   add_cell(row, node, cls);
+ }
+ 
+@@ -1039,7 +1039,10 @@
+         sum += sites[j + k] * weights[k];
+       }
+       var avg = sum / total_weight;
+-      var prob = avg / motif['total_sites'];
++      var prob = 0;
++      if (motif['total_sites'] > 0) {
++        prob = avg / motif['total_sites'];
++      }
+       y.push(prob);
+       x.push(xpos);
+     }
+@@ -1075,7 +1078,10 @@
+         sum += sites[j + k];
+       }
+       var avg = sum / windo;
+-      var prob = avg / motif['total_sites'];
++      var prob = 0;
++      if (motif['total_sites'] > 0) {
++        prob = avg / motif['total_sites'];
++      }
+       y.push(prob);
+       x.push(xpos);
+     }
+diff -r 2c18ee5e1d26 -r 7fb10f3c51c6 scripts/centrimo_webservice.pl.in
+--- a/scripts/centrimo_webservice.pl.in	Fri Jun 08 11:56:30 2012 +1000
++++ b/scripts/centrimo_webservice.pl.in	Fri Jun 08 14:56:00 2012 +1000
+@@ -196,7 +196,7 @@
+ push(@centrimo_args, '--bgfile', $bfile) if (defined($bfile));
+ push(@centrimo_args, '--score', $score) if (defined($score));
+ push(@centrimo_args, '--ethresh', $e_thresh) if (defined($e_thresh));
+-push(@centrimo_args, '--maxwin', $max_win) if (defined($max_win));
++push(@centrimo_args, '--maxbin', $max_win) if (defined($max_win));
+ push(@centrimo_args, '-dfile', 'description') if (-e 'description');
+ push(@centrimo_args, $sequences, @motifs);
+ add_status_msg('Starting centrimo<br><code>' . stringify_args('centrimo', @centrimo_args) . '</code>', $msg_list);
+diff -r fb056baf2bbe -r 8041784fd840 src/ceqlogo.c
+--- a/src/ceqlogo.c	Fri Jun 08 19:50:08 2012 -0700
++++ b/src/ceqlogo.c	Tue Jun 12 16:15:34 2012 +1000
+@@ -2471,7 +2471,7 @@
+     }
+   }
+     if(params->l_num == 0)
+-      CL_error("Input file is not specified!\n");
++      CL_error("No motifs loaded! Did you specify an input file?\n");
+   CL_exit(params, outfile);
+   LP_free(params);
+ }
+diff -r fb056baf2bbe -r 8041784fd840 src/motif-in-meme-text.c
+--- a/src/motif-in-meme-text.c	Fri Jun 08 19:50:08 2012 -0700
++++ b/src/motif-in-meme-text.c	Tue Jun 12 16:15:34 2012 +1000
+@@ -1231,6 +1231,7 @@
+     }
+     i++; // step over the newline
+   }
++  if (size == 0 && end) dispatch_line(parser, chunk, size, end);
+ }
+ 
+ short mtext_has_format_match(void *data) {
+diff -r 8041784fd840 scripts/metatest.pl.in
+--- a/scripts/metatest.pl.in	Tue Jun 12 16:15:34 2012 +1000
++++ b/scripts/metatest.pl.in	Wed Jun 13 11:32:54 2012 +1000
+@@ -378,7 +378,7 @@
+   # centrimo smoke test
+   $test_results += &smoke_test($update, $continue, $cleanup,
+     'centrimo', '',
+-    ['-verbosity', 1, '-oc', 'results/centrimo', 
++    ['-verbosity', 1, '-oc', 'results/centrimo', '-flip', 
+       '../doc/examples/sample-dna-Klf1.fa', 'centrimo/dreme-Klf1.txt'],
+     [
+       {

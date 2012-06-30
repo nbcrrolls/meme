@@ -1,0 +1,3748 @@
+# HG changeset patch
+# User James Johnson <j.johnson@imb.uq.edu.au>
+# Date 1329716601 -36000
+# Node ID 1d50103047dd1b7baf4f41fb1b3d5cdbbc2681dc
+# Parent  a111367593e3a9a3495d4a81b5976ec013ddf024
+Made the motif diagrams in the MEME text output linewrap.
+
+diff -r a111367593e3 -r 1d50103047dd src/display.c
+--- a/src/display.c	Thu Feb 16 17:51:34 2012 -0800
++++ b/src/display.c	Mon Feb 20 15:43:21 2012 +1000
+@@ -662,11 +662,30 @@
+     char *name = s->sample_name;
+     int lseq = s->length;
+     char *sequence = s->seq;
++    int col, offset;
+     TILING tiling = score_tile_diagram(NULL, sequence, lseq, los, nmotifs,
+       dna, stype, FALSE, xlate_dna, best_motifs, TRUE, pv, m_thresh, w_thresh,
+       use_seq_p, FALSE, NULL);
+-    fprintf(outfile, "%-*.*s %16.2e  %s\n", MSN, MSN, name, tiling.pv,
+-      tiling.diagram);
++    fprintf(outfile, "%-*.*s %16.2e  ", MSN, MSN, name, tiling.pv);
++    col = 43; offset = 0;
++    while (tiling.diagram[offset] != '\0') {
++      int j, max, last;
++      max = offset + (PAGEWIDTH - col - 1);
++      for (j = offset, last = offset; j < max; j++) {
++        if (tiling.diagram[j] == '\0') {
++          last = j;
++          break;
++        }
++        if (tiling.diagram[j] == '_') last = j+1;
++      }
++      if (tiling.diagram[last] != '\0') {
++        fprintf(outfile, "%.*s\\\n", (last-offset), tiling.diagram+offset); col = 0;
++        fputs("    ", outfile); col += 4;
++      } else {
++        fprintf(outfile, "%s\n", tiling.diagram+offset); col = 0;
++      }
++      offset = last;
++    }
+     free_tiling(tiling);
+   } /* sequence */
+ 
+# HG changeset patch
+# User James Johnson <j.johnson@imb.uq.edu.au>
+# Date 1329808355 -36000
+# Node ID 0098088505a9c1e7c04c15c91b0a845b4492a220
+# Parent  1d50103047dd1b7baf4f41fb1b3d5cdbbc2681dc
+Updated the motif reading code to allow for line breaks in the combined sites block diagrams.
+
+diff -r 1d50103047dd -r 0098088505a9 src/motif-in-meme-html.c
+--- a/src/motif-in-meme-html.c	Mon Feb 20 15:43:21 2012 +1000
++++ b/src/motif-in-meme-html.c	Tue Feb 21 17:12:35 2012 +1000
+@@ -454,10 +454,10 @@
+           "which is not a number.\n", type, name, value);
+     } else if (errno == ERANGE) {
+       if (sites == 0) {
+-        error(parser, "The %s of motif %s has a number of sites value \"%s\" "
++        html_error(parser, "The %s of motif %s has a number of sites value \"%s\" "
+             "which is too small to represent.\n", type, name, value);
+       } else {
+-        error(parser, "The %s of motif %s has a number of sites value \"%s\" "
++        html_error(parser, "The %s of motif %s has a number of sites value \"%s\" "
+             "which is too large to represent.\n", type, name, value);
+       }
+     } else {
+diff -r 1d50103047dd -r 0098088505a9 src/motif-in-meme-text.c
+--- a/src/motif-in-meme-text.c	Mon Feb 20 15:43:21 2012 +1000
++++ b/src/motif-in-meme-text.c	Tue Feb 21 17:12:35 2012 +1000
+@@ -25,6 +25,7 @@
+   MTEXT_IN_PSSM,
+   MTEXT_PRE_C_SITES,
+   MTEXT_IN_C_SITES,
++  MTEXT_IN_C_SITES_BLOCKS,
+   MTEXT_DONE
+ };
+ typedef enum mtext_state MTEXT_STATE_EN;
+@@ -50,7 +51,10 @@
+   int motif_count;
+   struct minfo* motif_lookup;
+   double scanned_sites_threshold;
+-  ARRAYLST_T *scanned_sites;
++  SCANNED_SITE_T *ssite_buffer;
++  int ssite_allocated;
++  int ssite_used;
++  ARRAYLST_T *scanned_seqs;
+ };
+ 
+ struct mscope {
+@@ -91,6 +95,7 @@
+   regex_t s_sites_seq;
+   regex_t s_sites_block;
+   regex_t s_sites_offset;
++  regex_t s_sites_end;
+ };
+ 
+ typedef struct mtext MTEXT_T;
+@@ -159,6 +164,7 @@
+ static const char * C_SITES_BLOCK_RE = "^([[<])([-+]?)([0-9]+)([abc]?)\\("
+     POS_NUM_RE "\\)([]>])";
+ static const char * C_SITES_OFFSET_RE = "^([0-9]+)";
++static const char * C_SITES_END_RE = "^\\\\$";
+ 
+ 
+ /*
+@@ -192,6 +198,7 @@
+   regcomp_or_die("c sites seq", &(re->s_sites_seq), C_SITES_SEQ_RE, REG_EXTENDED);
+   regcomp_or_die("c sites block", &(re->s_sites_block), C_SITES_BLOCK_RE, REG_EXTENDED);
+   regcomp_or_die("c sites offset", &(re->s_sites_offset), C_SITES_OFFSET_RE, REG_EXTENDED);
++  regcomp_or_die("c sites offset", &(re->s_sites_end), C_SITES_END_RE, REG_EXTENDED);
+ }
+ 
+ /*
+@@ -225,6 +232,7 @@
+   regfree(&(re->s_sites_seq));
+   regfree(&(re->s_sites_block));
+   regfree(&(re->s_sites_offset));
++  regfree(&(re->s_sites_end));
+ }
+ 
+ /*
+@@ -248,6 +256,7 @@
+   }
+   if (fscope->letter_freqs) free_array(fscope->letter_freqs);
+   if (fscope->motif_lookup) free(fscope->motif_lookup);
++  if (fscope->ssite_buffer) free(fscope->ssite_buffer);
+ }
+ 
+ /*
+@@ -987,83 +996,81 @@
+   }
+ }
+ 
+-static BOOLEAN_T count_sites(MTEXT_T *parser, const char *blocks, int *seq_site_count, int* seq_length) {
++static BOOLEAN_T state_in_s_sites_blocks(MTEXT_T *parser, const char *line) {
++  SCANNED_SEQ_T *sseq;
++  int i;
++  BOOLEAN_T continued;
++  const char *substr;
+   regmatch_t matches[8];
+-  const char *substr;
+-  int motif_i;
+-  // count the number of sites and calculate the sequence length
+-  substr = blocks;
+-  *seq_site_count = 0;
+-  *seq_length = 0;
++  
++  substr = line;
++  // skip leading whitespace
++  while (isspace(*substr)) substr++;
++  // get the scanned sequence object to store this information
++  if (parser->options & SCANNED_SITES) {
++    sseq = arraylst_get(arraylst_size(parser->fscope.scanned_seqs) - 1, 
++        parser->fscope.scanned_seqs);
++  } else {
++    sseq = NULL;
++  }
++  // tally up the components and check the structure
+   while (*substr != '\0') {
+     if (regexec_or_die("c sites block", &(parser->re.s_sites_block), substr, 8, matches, 0)) {
+-      if ((regex_chr(matches+1, substr) == '[' && 
+-            regex_chr(matches+7, substr) == '>') ||
+-          (regex_chr(matches+1, substr) == '<' && 
+-           regex_chr(matches+7, substr) == ']')) {
++      int motif_i;
++      // found a motif, check the brackets surrounding it match
++      // left bracket + 2 = right bracket in ascii
++      if ((regex_chr(matches+1, substr) + 2) != regex_chr(matches+7, substr)) {
+         error(parser, "Brackets don't match!\n");
+-        return FALSE;
++        return TRUE;
+       }
++      // get the index of the motif
+       motif_i = regex_int(matches+3, substr, 0) - 1; // turn into index
+       if (motif_i < 0 || motif_i >= parser->fscope.motif_count) {
+         error(parser, "Bad motif number %d in scanned sites.\n", motif_i +1);
+-        return FALSE;
++        return TRUE;
+       }
+       if (parser->options & SCANNED_SITES) {
+-        // motif_lookup is not avaliable unless SCANNED_SITES is set
+-        *seq_length += parser->fscope.motif_lookup[motif_i].length;
+-        (*seq_site_count)++;
++        BOOLEAN_T isstrong;
++        char strand;
++        double pvalue;
++        int motif_len;
++        motif_len = parser->fscope.motif_lookup[motif_i].length;
++        strand = regex_chr(matches+2, substr);
++        pvalue = regex_dbl(matches+5, substr); 
++        sseq_add_site(sseq, motif_i + 1, motif_len, strand, pvalue);
++      }
++      // move over the motif
++      substr += matches[0].rm_eo;
++    } else if (regexec_or_die("c sites offset", &(parser->re.s_sites_offset), substr, 2, matches, 0)) {
++      // found a part of the sequence with no motifs
++      if (parser->options & SCANNED_SITES) {
++        sseq_add_spacer(sseq, regex_int(matches+1, substr, 0));
+       }
+       substr += matches[0].rm_eo;
+-    } else if (regexec_or_die("c sites offset", &(parser->re.s_sites_offset), substr, 2, matches, 0)) {
+-      if (parser->options & SCANNED_SITES) {
+-        *seq_length += regex_int(matches+1, substr, 0);
+-      }
+-      substr += matches[0].rm_eo;
+-    } else if (!regexec_or_die("whitespace", &(parser->re.whitespace), substr, 0, matches, 0)) {
+-      error(parser, "Expected whitespace at end of combined sites line but got: %s\n", substr);
+-      return FALSE;
++    } else if (regexec_or_die("c sites end", &(parser->re.s_sites_end), substr, 0, matches, 0)) {
++      // found a line continuation indicator
++      continued = TRUE;
++      substr++;
++      break;
++    } else {
++      error(parser, "Unexpected text in combined sites: %s\n", substr);
++      return TRUE;
+     }
+-    if (*substr == '_') substr++;
++    if (*substr == '_') {
++      substr++;
++    } else if (*substr != '\0') {
++      error(parser, "Expected underscore!\n");
++      return TRUE;
++    }
++  }
++  if (continued) {
++    parser->state = MTEXT_IN_C_SITES_BLOCKS;
++  } else {
++    parser->state = MTEXT_IN_C_SITES;
+   }
+   return TRUE;
+ }
+ 
+-/*
+- * Note this function is only called when SCANNED_SITES option is set
+- */
+-static void parse_sites(MTEXT_T *parser, const char *blocks, int seq_site_count, int seq_length, SCANNED_SEQ_T *sseq) {
+-  regmatch_t matches[8];
+-  const char *substr;
+-  int offset, site_i, motif_num;
+-  BOOLEAN_T site_strong;
+-  char site_strand, site_frame;
+-  double site_pvalue;
+-  // read the scanned sites this time
+-  substr = blocks;
+-  offset = 0;
+-  site_i = 0;
+-  while (*substr != '\0') {
+-    if (regexec_or_die("c sites block", &(parser->re.s_sites_block), substr, 8, matches, 0)) {
+-      motif_num = regex_int(matches+3, substr, 0); // turn into index
+-
+-      site_strong = (regex_chr(matches+1, substr) == '[');
+-      site_strand = regex_chr(matches+2, substr);
+-      site_frame = regex_chr(matches+4, substr);
+-      site_pvalue = regex_dbl(matches+5, substr); 
+-
+-      sseq_set(sseq, site_i++, motif_num, site_strand, offset, site_pvalue);
+-
+-      offset += parser->fscope.motif_lookup[motif_num - 1].length;
+-      substr += matches[0].rm_eo;
+-    } else if (regexec_or_die("c sites offset", &(parser->re.s_sites_offset), substr, 2, matches, 0)) {
+-      offset += regex_int(matches+1, substr, 0);
+-      substr += matches[0].rm_eo;
+-    }      
+-    if (*substr == '_') substr++;
+-  }
+-}
+-
+ static BOOLEAN_T state_in_s_sites(MTEXT_T *parser, const char *line) {
+   regmatch_t matches[8];
+   const char *blocks, *substr;
+@@ -1073,25 +1080,19 @@
+   SCANNED_SEQ_T *sseq;
+ 
+   if (parser->options & SCANNED_SITES) {
+-    if (!parser->fscope.scanned_sites) 
+-      parser->fscope.scanned_sites = arraylst_create();
++    if (!parser->fscope.scanned_seqs) 
++      parser->fscope.scanned_seqs = arraylst_create();
+   }
+ 
+   if (regexec_or_die("c sites seq", &(parser->re.s_sites_seq), line, 5, matches, 0)) {
+     blocks = line+(matches[4].rm_so);
+-
+-    if (!count_sites(parser, blocks, &seq_site_count, &seq_length)) return TRUE;
+-
+-    if (parser->options & SCANNED_SITES) {
+-      seq_id = regex_str(matches+1, line);  
+-      seq_pvalue = regex_dbl(matches+2, line);
+-      sseq = sseq_create(seq_id, seq_length, seq_pvalue, seq_site_count);
+-      free(seq_id);
+-
+-      parse_sites(parser, blocks, seq_site_count, seq_length, sseq);
+-
+-      arraylst_add(sseq, parser->fscope.scanned_sites);
+-    }
++    seq_id = regex_str(matches+1, line);  
++    seq_pvalue = regex_dbl(matches+2, line);
++    sseq = sseq_create2(seq_id, seq_pvalue);
++    free(seq_id);
++    if (parser->options & SCANNED_SITES) 
++      arraylst_add(sseq, parser->fscope.scanned_seqs);
++    return state_in_s_sites_blocks(parser, blocks);
+   } else if (regexec_or_die("dashes", &(parser->re.s_sites_dashes), line, 0, matches, 0)) {
+     if (parser->options & SCANNED_SITES) parser->fscope.options_found |= SCANNED_SITES;
+     parser->state = MTEXT_DONE;
+@@ -1143,6 +1144,9 @@
+       case MTEXT_IN_C_SITES:
+         consumed = state_in_s_sites(parser, line);
+         break;
++      case MTEXT_IN_C_SITES_BLOCKS:
++        consumed = state_in_s_sites_blocks(parser, line);
++        break;
+       case MTEXT_DONE:
+         consumed = TRUE;
+         break;//do nothing
+@@ -1302,7 +1306,7 @@
+   }
+   switch (option) {
+     case SCANNED_SITES:
+-      return parser->fscope.scanned_sites;
++      return parser->fscope.scanned_seqs;
+     default:
+       die("Option code %d does not match any single option. "
+           "This means that it must contain multiple options "
+diff -r 1d50103047dd -r 0098088505a9 src/scanned-sequence.c
+--- a/src/scanned-sequence.c	Mon Feb 20 15:43:21 2012 +1000
++++ b/src/scanned-sequence.c	Tue Feb 21 17:12:35 2012 +1000
+@@ -23,6 +23,22 @@
+ }
+ 
+ /*
++ * Create a scanned sequence structure.
++ * The seq_id is copied. The length is initially set to
++ * zero as are the number of allocated sites. This is intended
++ * to be used with the sseq_add_site and sseq_add_spacer methods
++ * to build up the correct length and sites
++ */
++SCANNED_SEQ_T* sseq_create2(const char *seq_id, double pvalue) {
++  SCANNED_SEQ_T *sseq;
++  sseq = mm_malloc(sizeof(SCANNED_SEQ_T));
++  memset(sseq, 0, sizeof(SCANNED_SEQ_T));
++  sseq->seq_id = strdup(seq_id);
++  sseq->pvalue = pvalue;
++  return sseq;
++}
++
++/*
+  * Destroy the scanned sequence structure and all included scanned 
+  * site structures.
+  */
+@@ -48,3 +64,25 @@
+   ssite->position = position;
+   ssite->pvalue = pvalue;
+ }
++
++/*
++ * Add a scanned site. Intended to be used with sseq_create2
++ */
++void sseq_add_site(SCANNED_SEQ_T *sseq, int motif_num, int motif_len, char strand, double pvalue) {
++  SCANNED_SITE_T *ssite;
++  sseq->site_count += 1;
++  sseq->sites = mm_realloc(sseq->sites, sseq->site_count * sizeof(SCANNED_SEQ_T));
++  ssite = sseq->sites+(sseq->site_count - 1);
++  ssite->m_num = motif_num;
++  ssite->position = sseq->length;
++  ssite->strand = strand;
++  ssite->pvalue = pvalue;
++  sseq->length += motif_len;
++}
++
++/*
++ * Add a spacer. Intended to be used with sseq_create2
++ */
++void sseq_add_spacer(SCANNED_SEQ_T *sseq, int spacer_len) {
++  sseq->length += spacer_len;
++}
+diff -r 1d50103047dd -r 0098088505a9 src/scanned-sequence.h
+--- a/src/scanned-sequence.h	Mon Feb 20 15:43:21 2012 +1000
++++ b/src/scanned-sequence.h	Tue Feb 21 17:12:35 2012 +1000
+@@ -25,6 +25,14 @@
+  */
+ SCANNED_SEQ_T* sseq_create(const char *seq_id, long length, double pvalue, 
+     long site_count);
++/*
++ * Create a scanned sequence structure.
++ * The seq_id is copied. The length is initially set to
++ * zero as are the number of allocated sites. This is intended
++ * to be used with the sseq_add_site and sseq_add_spacer methods
++ * to build up the correct length and sites
++ */
++SCANNED_SEQ_T* sseq_create2(const char *seq_id, double pvalue);
+ 
+ /*
+  * Destroy the scanned sequence structure and all included scanned 
+@@ -38,4 +46,14 @@
+ void sseq_set(SCANNED_SEQ_T *sseq, int index, int m_num,
+     char strand, long position, double pvalue);
+ 
++/*
++ * Add a scanned site. Intended to be used with sseq_create2
++ */
++void sseq_add_site(SCANNED_SEQ_T *sseq, int motif_num, int motif_len, char strand, double pvalue);
++
++/*
++ * Add a spacer. Intended to be used with sseq_create2
++ */
++void sseq_add_spacer(SCANNED_SEQ_T *sseq, int spacer_len);
++
+ #endif
+# HG changeset patch
+# User James Johnson <j.johnson@imb.uq.edu.au>
+# Date 1329875186 -36000
+# Node ID d57b03b5217dbfcc6439c7b91b327b27b8df4396
+# Parent  0098088505a9c1e7c04c15c91b0a845b4492a220
+Fixed an unallocated variable in the motif-in-meme-text parser which annoyingly the compiler didn't complain about.
+
+Also fixed a memory leak in fimo (not deallocating the motif parser) and a
+(unimportant I think) memory bug in alignment.c
+
+diff -r 0098088505a9 -r d57b03b5217d src/alignment.c
+--- a/src/alignment.c	Tue Feb 21 17:12:35 2012 +1000
++++ b/src/alignment.c	Wed Feb 22 11:46:26 2012 +1000
+@@ -62,12 +62,16 @@
+       fprintf(stderr, "Warning: truncating alignment program name %s to %s.\n",
+ 	      name, new_alignment->name);
+     }
++  } else {
++    new_alignment->name[0] = '\0';
+   }
+ 
+   // Store the description, truncating if necessary.
+   if (description != NULL) {
+     strncpy(new_alignment->desc, description, MAX_ALIGNMENT_COMMENT);
+     new_alignment->desc[MAX_ALIGNMENT_COMMENT] = '\0';
++  } else {
++    new_alignment->desc[0] = '\0';
+   }
+ 
+   // Store the sequences.
+diff -r 0098088505a9 -r d57b03b5217d src/fimo.c
+--- a/src/fimo.c	Tue Feb 21 17:12:35 2012 +1000
++++ b/src/fimo.c	Wed Feb 22 11:46:26 2012 +1000
+@@ -959,6 +959,7 @@
+   motifs = mread_load(mread, NULL);
+   options.alphabet = mread_get_alphabet(mread);
+   bg_freqs = mread_get_background(mread);
++  mread_destroy(mread);
+ 
+   // Doesn't include rev comp motifs
+   int num_motif_names = arraylst_size(motifs);
+diff -r 0098088505a9 -r d57b03b5217d src/motif-in-meme-text.c
+--- a/src/motif-in-meme-text.c	Tue Feb 21 17:12:35 2012 +1000
++++ b/src/motif-in-meme-text.c	Wed Feb 22 11:46:26 2012 +1000
+@@ -118,7 +118,7 @@
+ static const char * VERSION_RE = "^[[:space:]]*MEME[[:space:]]+version"
+     "[[:space:]]+([0-9]+)(\\.([0-9]+)(\\.([0-9]+))?)?([^0-9].*)?$";
+ static const char * RELEASE_RE ="[[:space:]]+\\(Release[[:space:]]+date:"
+-    "[[:space:]]+([^[:space:]][^\\)]+)\\)";
++    "[[:space:]]+(.+)\\)[[:space:]]*$";
+ static const char * DATAFILE_RE = "^[[:space:]]*DATAFILE[[:space:]]*="
+     "[[:space:]]*([^[:space:]].*)$";
+ static const char * ALPHABET_RE = "^[[:space:]]*ALPHABET[[:space:]]*="
+@@ -664,9 +664,11 @@
+  */
+ static BOOLEAN_T state_find_version(MTEXT_T *parser, const char *line) {
+   regmatch_t matches[7];
++  memset(matches, 0, sizeof(regmatch_t)*7);
+   if (regexec_or_die("html", &(parser->re.html), line, 0, matches, 0)) {
+     parser->fscope.is_html = TRUE; 
+   }
++  memset(matches, 0, sizeof(regmatch_t)*7);
+   if (regexec_or_die("version", &(parser->re.version), line, 7, matches, 0)) {
+     parser->fscope.vmajor = regex_int(matches+1, line, 0);
+     parser->fscope.vminor = regex_int(matches+3, line, 0);
+@@ -1003,6 +1005,7 @@
+   const char *substr;
+   regmatch_t matches[8];
+   
++  continued = FALSE;
+   substr = line;
+   // skip leading whitespace
+   while (isspace(*substr)) substr++;
+@@ -1086,12 +1089,12 @@
+ 
+   if (regexec_or_die("c sites seq", &(parser->re.s_sites_seq), line, 5, matches, 0)) {
+     blocks = line+(matches[4].rm_so);
+-    seq_id = regex_str(matches+1, line);  
+-    seq_pvalue = regex_dbl(matches+2, line);
+-    sseq = sseq_create2(seq_id, seq_pvalue);
+-    free(seq_id);
+-    if (parser->options & SCANNED_SITES) 
++    if (parser->options & SCANNED_SITES)  {
++      seq_id = regex_str(matches+1, line);  
++      seq_pvalue = regex_dbl(matches+2, line);
++      sseq = sseq_create2(seq_id, seq_pvalue);
+       arraylst_add(sseq, parser->fscope.scanned_seqs);
++    }
+     return state_in_s_sites_blocks(parser, blocks);
+   } else if (regexec_or_die("dashes", &(parser->re.s_sites_dashes), line, 0, matches, 0)) {
+     if (parser->options & SCANNED_SITES) parser->fscope.options_found |= SCANNED_SITES;
+diff -r 0098088505a9 -r d57b03b5217d src/scanned-sequence.c
+--- a/src/scanned-sequence.c	Tue Feb 21 17:12:35 2012 +1000
++++ b/src/scanned-sequence.c	Wed Feb 22 11:46:26 2012 +1000
+@@ -24,16 +24,16 @@
+ 
+ /*
+  * Create a scanned sequence structure.
+- * The seq_id is copied. The length is initially set to
++ * The seq_id is used (not copied). The length is initially set to
+  * zero as are the number of allocated sites. This is intended
+  * to be used with the sseq_add_site and sseq_add_spacer methods
+  * to build up the correct length and sites
+  */
+-SCANNED_SEQ_T* sseq_create2(const char *seq_id, double pvalue) {
++SCANNED_SEQ_T* sseq_create2(char *seq_id, double pvalue) {
+   SCANNED_SEQ_T *sseq;
+   sseq = mm_malloc(sizeof(SCANNED_SEQ_T));
+   memset(sseq, 0, sizeof(SCANNED_SEQ_T));
+-  sseq->seq_id = strdup(seq_id);
++  sseq->seq_id = seq_id;
+   sseq->pvalue = pvalue;
+   return sseq;
+ }
+diff -r 0098088505a9 -r d57b03b5217d src/scanned-sequence.h
+--- a/src/scanned-sequence.h	Tue Feb 21 17:12:35 2012 +1000
++++ b/src/scanned-sequence.h	Wed Feb 22 11:46:26 2012 +1000
+@@ -27,12 +27,12 @@
+     long site_count);
+ /*
+  * Create a scanned sequence structure.
+- * The seq_id is copied. The length is initially set to
++ * The seq_id is used (not copied). The length is initially set to
+  * zero as are the number of allocated sites. This is intended
+  * to be used with the sseq_add_site and sseq_add_spacer methods
+  * to build up the correct length and sites
+  */
+-SCANNED_SEQ_T* sseq_create2(const char *seq_id, double pvalue);
++SCANNED_SEQ_T* sseq_create2(char *seq_id, double pvalue);
+ 
+ /*
+  * Destroy the scanned sequence structure and all included scanned 
+# HG changeset patch
+# User James Johnson <j.johnson@imb.uq.edu.au>
+# Date 1329878883 -36000
+# Node ID 5836e70b683453aef651d1d48929dc3ccbe33e4f
+# Parent  d57b03b5217dbfcc6439c7b91b327b27b8df4396
+Replaced instances of ETC_DIR with calls to get_meme_etc_dir().
+
+diff -r d57b03b5217d -r 5836e70b6834 src/beadstring.c
+--- a/src/beadstring.c	Wed Feb 22 11:46:26 2012 +1000
++++ b/src/beadstring.c	Wed Feb 22 12:48:03 2012 +1000
+@@ -743,10 +743,10 @@
+     const char *GFF_FILENAME = "beadstring.gff";
+     char *sequence_path = make_path_to_file(options->output_dirname, SEQUENCE_FILENAME);
+     char *cisml_path = make_path_to_file(options->output_dirname, CISML_FILENAME);
+-    char *html_stylesheet_path = make_path_to_file(ETC_DIR, HTML_STYLESHEET);
+-    char *css_stylesheet_path = make_path_to_file(ETC_DIR, CSS_STYLESHEET);
+-    char *text_stylesheet_path = make_path_to_file(ETC_DIR, TEXT_STYLESHEET);
+-    char *gff_stylesheet_path = make_path_to_file(ETC_DIR, GFF_STYLESHEET);
++    char *html_stylesheet_path = make_path_to_file(get_meme_etc_dir(), HTML_STYLESHEET);
++    char *css_stylesheet_path = make_path_to_file(get_meme_etc_dir(), CSS_STYLESHEET);
++    char *text_stylesheet_path = make_path_to_file(get_meme_etc_dir(), TEXT_STYLESHEET);
++    char *gff_stylesheet_path = make_path_to_file(get_meme_etc_dir(), GFF_STYLESHEET);
+     char *html_path = make_path_to_file(options->output_dirname, HTML_FILENAME);
+     char *text_path = make_path_to_file(options->output_dirname, TEXT_FILENAME);
+     char *gff_path = make_path_to_file(options->output_dirname, GFF_FILENAME);
+diff -r d57b03b5217d -r 5836e70b6834 src/ceqlogo.c
+--- a/src/ceqlogo.c	Wed Feb 22 11:46:26 2012 +1000
++++ b/src/ceqlogo.c	Wed Feb 22 12:48:03 2012 +1000
+@@ -53,9 +53,9 @@
+ 
+ /* ----------------------- Global Constants ---------------------------- */
+ /* Path to the template file */
+-#define TEMPLATE_SVG ETC_DIR"/template.svg"
++#define TEMPLATE_SVG "template.svg"
+ /* Path to the template file */
+-#define TEMPLATE_EPS ETC_DIR"/template.eps"
++#define TEMPLATE_EPS "template.eps"
+ /* Flags to pass to Ghostscript */
+ #define GHOSTSCRIPT_FLAGS " -q -r100 -dSAFER -dBATCH -dNOPAUSE " \
+   "-dDOINTERPOLATE -sDEVICE=pngalpha -dBackgroundColor=16#FFFFFF " \
+@@ -2071,6 +2071,7 @@
+ 
+ void SVG_exit(LP_PARAMS_T* params, FILE *fout) {
+   int    lnr;
++  char*  template;
+   char*  data     = LP_get_value(params, "$DATA");
+   double fs       = LP_get_doublevalue(params, "$FONTSIZE");
+   double tfs      = LP_get_doublevalue(params, "$TITLEFONTSIZE");
+@@ -2105,9 +2106,11 @@
+ 
+   params->values[LP_get_index(params,"$DATA")] = data;
+ 
+-  FILE *fin  = F_open(TEMPLATE_SVG, "r");
++  template = make_path_to_file(get_meme_etc_dir(), TEMPLATE_SVG);
++  FILE *fin  = F_open(template, "r");
+     LP_file_replace(params, fin, fout, 1000);
+   F_close(fin);
++  free(template);
+ 
+   params->initialized = 0;
+ }
+@@ -2237,6 +2240,7 @@
+ /*.......................................................................*/
+ 
+ void EPS_exit(LP_PARAMS_T* params, FILE *fout) {
++  char*  template;
+   char   buffer[1000];
+   int    lnr;
+   char*  data       = LP_get_value(params, "$DATA");
+@@ -2307,9 +2311,11 @@
+   LP_set_doublevalue(params, "$LOGOLINEHEIGHT", height/params->l_num);
+   LP_set_intvalue(params, "$CHARSPERLINE", maxcharnum);
+ 
+-  FILE *fin  = F_open(TEMPLATE_EPS, "r");
++  template = make_path_to_file(get_meme_etc_dir(), TEMPLATE_EPS);
++  FILE *fin  = F_open(template, "r");
+     LP_file_replace(params, fin, fout, 1000);
+   F_close(fin);
++  free(template);
+ 
+   params->initialized = 0;
+ }
+diff -r d57b03b5217d -r 5836e70b6834 src/cisml.c
+--- a/src/cisml.c	Wed Feb 22 11:46:26 2012 +1000
++++ b/src/cisml.c	Wed Feb 22 12:48:03 2012 +1000
+@@ -23,6 +23,7 @@
+ #include "qvalue.h"
+ #include "xml-util.h"
+ #include "cisml-dtd.h"
++#include "utils.h"
+ 
+ #include "array.h"
+ const int PATTERN_INCREMENT = 5;
+@@ -3720,10 +3721,10 @@
+   const char* CSS_STYLESHEET = "cisml.css";
+   const char* GFF_STYLESHEET = "cisml-to-gff.xsl";
+   const char* TEXT_STYLESHEET = "cisml-to-text.xsl";
+-  char *html_stylesheet_path = make_path_to_file(ETC_DIR, HTML_STYLESHEET);
+-  char *css_stylesheet_path = make_path_to_file(ETC_DIR, CSS_STYLESHEET);
+-  char *text_stylesheet_path = make_path_to_file(ETC_DIR, TEXT_STYLESHEET);
+-  char *gff_stylesheet_path = make_path_to_file(ETC_DIR, GFF_STYLESHEET);
++  char *html_stylesheet_path = make_path_to_file(get_meme_etc_dir(), HTML_STYLESHEET);
++  char *css_stylesheet_path = make_path_to_file(get_meme_etc_dir(), CSS_STYLESHEET);
++  char *text_stylesheet_path = make_path_to_file(get_meme_etc_dir(), TEXT_STYLESHEET);
++  char *gff_stylesheet_path = make_path_to_file(get_meme_etc_dir(), GFF_STYLESHEET);
+   char *xml_path = make_path_to_file(output_dirname, xml_filename);
+   char *html_path = make_path_to_file(output_dirname, html_filename);
+   char *text_path = make_path_to_file(output_dirname, text_filename);
+diff -r d57b03b5217d -r 5836e70b6834 src/fimo.c
+--- a/src/fimo.c	Wed Feb 22 11:46:26 2012 +1000
++++ b/src/fimo.c	Wed Feb 22 12:48:03 2012 +1000
+@@ -367,17 +367,17 @@
+   options->WIGGLE_FILENAME = "fimo.wig";
+   options->FIMO_FILENAME = "fimo.xml";
+   options->CISML_FILENAME = "cisml.xml";
+-  options->text_stylesheet_path = make_path_to_file(ETC_DIR, options->TEXT_STYLESHEET);
+-  options->gff_stylesheet_path = make_path_to_file(ETC_DIR, options->GFF_STYLESHEET);
+-  options->wiggle_stylesheet_path = make_path_to_file(ETC_DIR, options->WIGGLE_STYLESHEET);
++  options->text_stylesheet_path = make_path_to_file(get_meme_etc_dir(), options->TEXT_STYLESHEET);
++  options->gff_stylesheet_path = make_path_to_file(get_meme_etc_dir(), options->GFF_STYLESHEET);
++  options->wiggle_stylesheet_path = make_path_to_file(get_meme_etc_dir(), options->WIGGLE_STYLESHEET);
+   options->html_path = make_path_to_file(options->output_dirname, options->HTML_FILENAME);
+   options->text_path = make_path_to_file(options->output_dirname, options->TEXT_FILENAME);
+   options->gff_path = make_path_to_file(options->output_dirname, options->GFF_FILENAME);
+   options->wiggle_path = make_path_to_file(options->output_dirname, options->WIGGLE_FILENAME);
+-  options->html_stylesheet_path = make_path_to_file(ETC_DIR, options->HTML_STYLESHEET);
++  options->html_stylesheet_path = make_path_to_file(get_meme_etc_dir(), options->HTML_STYLESHEET);
+   options->html_stylesheet_local_path
+     = make_path_to_file(options->output_dirname, options->HTML_STYLESHEET);
+-  options->css_stylesheet_path = make_path_to_file(ETC_DIR, options->CSS_STYLESHEET);
++  options->css_stylesheet_path = make_path_to_file(get_meme_etc_dir(), options->CSS_STYLESHEET);
+   options->css_stylesheet_local_path
+     = make_path_to_file(options->output_dirname, options->CSS_STYLESHEET);
+   options->fimo_path = make_path_to_file(options->output_dirname, options->FIMO_FILENAME);
+diff -r d57b03b5217d -r 5836e70b6834 src/gomo.c
+--- a/src/gomo.c	Wed Feb 22 11:46:26 2012 +1000
++++ b/src/gomo.c	Wed Feb 22 12:48:03 2012 +1000
+@@ -1949,7 +1949,7 @@
+       exit(1);
+     }
+     //copy the question mark image
+-    clone_file(ETC_DIR, HELP_IMG, res_dir, HELP_IMG);
++    clone_file(get_meme_etc_dir(), HELP_IMG, res_dir, HELP_IMG);
+     // Create the name of the text output file
+     // "<dir>/XML_FILENAME" and open it for writing
+     xml_path = make_path_to_file(out_dir, XML_FILENAME);
+@@ -2042,7 +2042,7 @@
+     // html files become to big for non-constrainted q-values
+     if (q_threshold <= 0.5) {
+       char *stylesheet_path, *html_path;
+-      stylesheet_path = make_path_to_file(ETC_DIR, HTML_STYLESHEET);
++      stylesheet_path = make_path_to_file(get_meme_etc_dir(), HTML_STYLESHEET);
+       html_path = make_path_to_file(out_dir, HTML_FILENAME);
+       if (file_exists(stylesheet_path)) {
+         print_xml_filename_to_filename_using_stylesheet(
+diff -r d57b03b5217d -r 5836e70b6834 src/mast.c
+--- a/src/mast.c	Wed Feb 22 11:46:26 2012 +1000
++++ b/src/mast.c	Wed Feb 22 12:48:03 2012 +1000
+@@ -1987,7 +1987,7 @@
+   //output alternate formats
+   if (xml_path && html) {
+     char *stylesheet_path, *html_path;
+-    stylesheet_path = make_path_to_file(ETC_DIR, HTML_STYLESHEET);
++    stylesheet_path = make_path_to_file(get_meme_etc_dir(), HTML_STYLESHEET);
+     html_path = make_path_to_file(out_dir, HTML_FILENAME);
+     if (file_exists(stylesheet_path)) {
+       print_xml_filename_to_filename_using_stylesheet(
+diff -r d57b03b5217d -r 5836e70b6834 src/meme.c
+--- a/src/meme.c	Wed Feb 22 11:46:26 2012 +1000
++++ b/src/meme.c	Wed Feb 22 12:48:03 2012 +1000
+@@ -472,10 +472,10 @@
+ #ifdef DEBUG_PARALLEL
+   fprintf(stderr, "%d: At make_path_to_file\n", mpMyID()); fflush(stderr);
+ #endif
+-    char * stylesheet_path = make_path_to_file(ETC_DIR, stylesheet_filename);
++    char * stylesheet_path = make_path_to_file(get_meme_etc_dir(), stylesheet_filename);
+     char * xml_path = make_path_to_file(output_dirname, xml_filename);
+     char * html_path = make_path_to_file(output_dirname, html_filename);
+-    char * helpimg_path = make_path_to_file(ETC_DIR, helpimg_filename);
++    char * helpimg_path = make_path_to_file(get_meme_etc_dir(), helpimg_filename);
+     char * helpimg_copy_path = make_path_to_file(output_dirname, helpimg_filename);
+ #ifdef DEBUG_PARALLEL
+   fprintf(stderr, "%d: At print_meme_file_xml\n", mpMyID()); fflush(stderr);
+diff -r d57b03b5217d -r 5836e70b6834 src/spamo-output.c
+--- a/src/spamo-output.c	Wed Feb 22 11:46:26 2012 +1000
++++ b/src/spamo-output.c	Wed Feb 22 12:48:03 2012 +1000
+@@ -9,6 +9,7 @@
+ #include "eps2png.h"
+ #include "spamo-output.h"
+ #include "string-builder.h"
++#include "utils.h"
+ #include "xml-out.h"
+ #include "seq-reader-from-fasta.h"
+ 
+@@ -408,7 +409,7 @@
+   //check that histograms are actually wanted
+   if (!(make_eps || make_png)) return;
+   //check that we have access to the template, otherwise we can't create any histograms
+-  template_path = make_path_to_file(ETC_DIR, SPAMO_EPS_TEMPLATE_FILE);
++  template_path = make_path_to_file(get_meme_etc_dir(), SPAMO_EPS_TEMPLATE_FILE);
+   if (!file_exists(template_path)) {
+     fprintf(stderr, "Warning: Can not find SpaMo histogram template file \"%s\". Skiping creation of histograms.\n", template_path);
+     free(template_path);
+diff -r d57b03b5217d -r 5836e70b6834 src/spamo.c
+--- a/src/spamo.c	Wed Feb 22 11:46:26 2012 +1000
++++ b/src/spamo.c	Wed Feb 22 12:48:03 2012 +1000
+@@ -1288,7 +1288,7 @@
+   char *xsl_path, *xml_path, *html_path;
+   if (!options->xslt) return;
+   xml_path = make_path_to_file(options->outdir, SPAMO_XML_FILE);
+-  xsl_path = make_path_to_file(ETC_DIR, SPAMO_XSL_FILE);
++  xsl_path = make_path_to_file(get_meme_etc_dir(), SPAMO_XSL_FILE);
+   html_path = make_path_to_file(options->outdir, SPAMO_HTML_FILE);
+   if (!file_exists(xsl_path)) {
+     fprintf(stderr, "Warning: Can not find SpaMo xml to html stylesheet file \"%s\". Skiping creation of html.\n", xsl_path);
+diff -r d57b03b5217d -r 5836e70b6834 src/tomtom.c
+--- a/src/tomtom.c	Wed Feb 22 11:46:26 2012 +1000
++++ b/src/tomtom.c	Wed Feb 22 12:48:03 2012 +1000
+@@ -2768,7 +2768,7 @@
+     //generate html from xml
+     if (html) {
+       char *stylesheet_path, *html_path;
+-      stylesheet_path = make_path_to_file(ETC_DIR, HTML_STYLESHEET);
++      stylesheet_path = make_path_to_file(get_meme_etc_dir(), HTML_STYLESHEET);
+       html_path = make_path_to_file(output_dirname, HTML_FILENAME);
+       if (file_exists(stylesheet_path)) {
+         print_xml_filename_to_filename_using_stylesheet(
+# HG changeset patch
+# User James Johnson <j.johnson@imb.uq.edu.au>
+# Date 1329885982 -36000
+# Node ID 81f90e1597b487144ea82df256c8b1eccd8a3923
+# Parent  5836e70b683453aef651d1d48929dc3ccbe33e4f
+Updated meme tests.
+
+diff -r 5836e70b6834 -r 81f90e1597b4 tests/meme/meme.INO_up800.oops
+--- a/tests/meme/meme.INO_up800.oops	Wed Feb 22 12:48:03 2012 +1000
++++ b/tests/meme/meme.INO_up800.oops	Wed Feb 22 14:46:22 2012 +1000
+@@ -1,7 +1,7 @@
+ ********************************************************************************
+ MEME - Motif discovery tool
+ ********************************************************************************
+-MEME version 4.0.0 (Release date: 2008-07-12 05:23:09 +1000 (Sat, 12 Jul 2008))
++MEME version 4.8.1 (Release date: Wed Feb 22 11:51:06 EST 2012)
+ 
+ For further information on how to interpret these results or to get
+ a copy of the MEME software please access http://meme.nbcr.net.
+@@ -28,7 +28,7 @@
+ ********************************************************************************
+ TRAINING SET
+ ********************************************************************************
+-DATAFILE= /home/t.bailey/MEME/SVNROOT/trunk/scripts/../tests/common/INO_up800.s
++DATAFILE= /home/james/dist/scripts/../tests/common/INO_up800.s
+ ALPHABET= ACGT
+ Sequence name            Weight Length  Sequence name            Weight Length  
+ -------------            ------ ------  -------------            ------ ------  
+@@ -44,7 +44,7 @@
+ This information can also be useful in the event you wish to report a
+ problem with the MEME software.
+ 
+-command: meme /home/t.bailey/MEME/SVNROOT/trunk/scripts/../tests/common/INO_up800.s -text -mod oops -dna -revcomp -bfile /home/t.bailey/MEME/SVNROOT/trunk/scripts/../tests/common/yeast.nc.6.freq -x_branch -nostatus -nmotifs 2 -minw 8 
++command: meme /home/james/dist/scripts/../tests/common/INO_up800.s -text -mod oops -dna -revcomp -bfile /home/james/dist/scripts/../tests/common/yeast.nc.6.freq -x_branch -nostatus -nmotifs 2 -minw 8 
+ 
+ model:  mod=          oops    nmotifs=         2    evt=           inf
+ object function=  E-value of product of p-values
+@@ -61,7 +61,7 @@
+ sample: seed=            0    seqfrac=         1
+ Letter frequencies in dataset:
+ A 0.304 C 0.196 G 0.196 T 0.304 
+-Background letter frequencies (from /home/t.bailey/MEME/SVNROOT/trunk/scripts/../tests/common/yeast.nc.6.freq):
++Background letter frequencies (from /home/james/dist/scripts/../tests/common/yeast.nc.6.freq):
+ A 0.324 C 0.176 G 0.176 T 0.324 
+ ********************************************************************************
+ 
+@@ -193,7 +193,7 @@
+ 
+ 
+ 
+-Time 12.74 secs.
++Time  9.08 secs.
+ 
+ ********************************************************************************
+ 
+@@ -311,7 +311,7 @@
+ 
+ 
+ 
+-Time 25.15 secs.
++Time 17.88 secs.
+ 
+ ********************************************************************************
+ 
+@@ -325,13 +325,20 @@
+ --------------------------------------------------------------------------------
+ SEQUENCE NAME            COMBINED P-VALUE  MOTIF DIAGRAM
+ -------------            ----------------  -------------
+-CHO1                             1.89e-07  152_[+2(1.11e-05)]_396_[-2(3.28e-07)]_38_[-1(2.43e-05)]_12_[-1(1.20e-08)]_148
+-CHO2                             2.32e-06  349_[-1(6.52e-09)]_46_[-2(8.59e-06)]_378
+-FAS1                             1.64e-06  43_[+2(6.33e-06)]_37_[-1(6.11e-09)]_693
+-FAS2                             1.75e-05  184_[-2(8.59e-06)]_368_[-1(5.67e-08)]_221
+-ACC1                             1.89e-07  78_[-1(1.20e-08)]_136_[+2(3.28e-07)]_559
+-INO1                             1.22e-07  282_[-2(5.36e-06)]_256_[+1(9.62e-05)]_4_[+1(5.31e-05)]_32_[+1(4.64e-10)]_165
+-OPI3                             5.70e-07  185_[-2(3.28e-07)]_388_[+1(3.84e-08)]_32_[-1(3.61e-05)]_151
++CHO1                             1.89e-07  152_[+2(1.11e-05)]_396_\
++    [-2(3.28e-07)]_38_[-1(2.43e-05)]_12_[-1(1.20e-08)]_148
++CHO2                             2.32e-06  349_[-1(6.52e-09)]_46_\
++    [-2(8.59e-06)]_378
++FAS1                             1.64e-06  43_[+2(6.33e-06)]_37_[-1(6.11e-09)]_\
++    693
++FAS2                             1.75e-05  184_[-2(8.59e-06)]_368_\
++    [-1(5.67e-08)]_221
++ACC1                             1.89e-07  78_[-1(1.20e-08)]_136_\
++    [+2(3.28e-07)]_559
++INO1                             1.22e-07  282_[-2(5.36e-06)]_256_\
++    [+1(9.62e-05)]_4_[+1(5.31e-05)]_32_[+1(4.64e-10)]_165
++OPI3                             5.70e-07  185_[-2(3.28e-07)]_388_\
++    [+1(3.84e-08)]_32_[-1(3.61e-05)]_151
+ --------------------------------------------------------------------------------
+ 
+ ********************************************************************************
+@@ -341,6 +348,6 @@
+ Stopped because nmotifs = 2 reached.
+ ********************************************************************************
+ 
+-CPU: tlb-sayonara.imb.uq.edu.au
++CPU: tlb-squirrel
+ 
+ ********************************************************************************
+diff -r 5836e70b6834 -r 81f90e1597b4 tests/meme/meme.INO_up800.tcm
+--- a/tests/meme/meme.INO_up800.tcm	Wed Feb 22 12:48:03 2012 +1000
++++ b/tests/meme/meme.INO_up800.tcm	Wed Feb 22 14:46:22 2012 +1000
+@@ -1,7 +1,7 @@
+ ********************************************************************************
+ MEME - Motif discovery tool
+ ********************************************************************************
+-MEME version 4.0.0 (Release date: 2008-07-12 05:23:09 +1000 (Sat, 12 Jul 2008))
++MEME version 4.8.1 (Release date: Wed Feb 22 11:51:06 EST 2012)
+ 
+ For further information on how to interpret these results or to get
+ a copy of the MEME software please access http://meme.nbcr.net.
+@@ -28,7 +28,7 @@
+ ********************************************************************************
+ TRAINING SET
+ ********************************************************************************
+-DATAFILE= /home/t.bailey/MEME/SVNROOT/trunk/scripts/../tests/common/INO_up800.s
++DATAFILE= /home/james/dist/scripts/../tests/common/INO_up800.s
+ ALPHABET= ACGT
+ Sequence name            Weight Length  Sequence name            Weight Length  
+ -------------            ------ ------  -------------            ------ ------  
+@@ -44,7 +44,7 @@
+ This information can also be useful in the event you wish to report a
+ problem with the MEME software.
+ 
+-command: meme /home/t.bailey/MEME/SVNROOT/trunk/scripts/../tests/common/INO_up800.s -text -mod tcm -dna -revcomp -bfile /home/t.bailey/MEME/SVNROOT/trunk/scripts/../tests/common/yeast.nc.6.freq -x_branch -nostatus -nmotifs 2 -minw 8 
++command: meme /home/james/dist/scripts/../tests/common/INO_up800.s -text -mod tcm -dna -revcomp -bfile /home/james/dist/scripts/../tests/common/yeast.nc.6.freq -x_branch -nostatus -nmotifs 2 -minw 8 
+ 
+ model:  mod=           tcm    nmotifs=         2    evt=           inf
+ object function=  E-value of product of p-values
+@@ -61,7 +61,7 @@
+ sample: seed=            0    seqfrac=         1
+ Letter frequencies in dataset:
+ A 0.304 C 0.196 G 0.196 T 0.304 
+-Background letter frequencies (from /home/t.bailey/MEME/SVNROOT/trunk/scripts/../tests/common/yeast.nc.6.freq):
++Background letter frequencies (from /home/james/dist/scripts/../tests/common/yeast.nc.6.freq):
+ A 0.324 C 0.176 G 0.176 T 0.324 
+ ********************************************************************************
+ 
+@@ -191,7 +191,7 @@
+ 
+ 
+ 
+-Time 92.97 secs.
++Time 66.02 secs.
+ 
+ ********************************************************************************
+ 
+@@ -386,7 +386,7 @@
+ 
+ 
+ 
+-Time 183.58 secs.
++Time 131.88 secs.
+ 
+ ********************************************************************************
+ 
+@@ -400,13 +400,21 @@
+ --------------------------------------------------------------------------------
+ SEQUENCE NAME            COMBINED P-VALUE  MOTIF DIAGRAM
+ -------------            ----------------  -------------
+-CHO1                             1.81e-05  33_[-2(6.95e-06)]_548_[+1(3.43e-07)]_16_[+1(7.37e-08)]_85_[+2(6.95e-06)]_34
+-CHO2                             1.30e-05  62_[-2(8.56e-07)]_262_[+1(4.16e-07)]_137_[+2(1.76e-06)]_91_[+2(1.35e-06)]_148
+-FAS1                             4.92e-09  94_[+1(3.29e-09)]_245_[+2(2.64e-08)]_60_[-2(1.03e-06)]_54_[+2(2.69e-06)]_247
+-FAS2                             4.93e-07  107_[-2(4.38e-06)]_48_[-2(2.64e-08)]_30_[+2(7.83e-08)]_112_[+2(1.76e-06)]_153_[+1(4.16e-07)]_221
+-ACC1                             4.67e-07  82_[+1(1.88e-07)]_173_[+2(2.90e-07)]_[+2(5.51e-08)]_22_[-2(1.10e-07)]_353_[+2(2.36e-07)]_41
+-INO1                             9.37e-13  92_[+2(4.81e-07)]_55_[+2(1.35e-06)]_39_[+2(1.24e-06)]_216_[+2(3.82e-13)]_51_[-1(2.24e-06)]_36_[-1(3.13e-08)]_5_[+2(5.85e-07)]_21_[+1(1.72e-07)]_61_[+2(6.20e-08)]_11
+-OPI3                             9.38e-05  276_[+2(1.24e-06)]_93_[+2(5.54e-06)]_101_[+2(6.45e-06)]_26_[-1(2.44e-06)]_174_[-2(2.09e-06)]_1
++CHO1                             1.81e-05  33_[-2(6.95e-06)]_548_\
++    [+1(3.43e-07)]_16_[+1(7.37e-08)]_85_[+2(6.95e-06)]_34
++CHO2                             1.30e-05  62_[-2(8.56e-07)]_262_\
++    [+1(4.16e-07)]_137_[+2(1.76e-06)]_91_[+2(1.35e-06)]_148
++FAS1                             4.92e-09  94_[+1(3.29e-09)]_245_\
++    [+2(2.64e-08)]_60_[-2(1.03e-06)]_54_[+2(2.69e-06)]_247
++FAS2                             4.93e-07  107_[-2(4.38e-06)]_48_\
++    [-2(2.64e-08)]_30_[+2(7.83e-08)]_112_[+2(1.76e-06)]_153_[+1(4.16e-07)]_221
++ACC1                             4.67e-07  82_[+1(1.88e-07)]_173_\
++    [+2(2.90e-07)]_[+2(5.51e-08)]_22_[-2(1.10e-07)]_353_[+2(2.36e-07)]_41
++INO1                             9.37e-13  92_[+2(4.81e-07)]_55_[+2(1.35e-06)]_\
++    39_[+2(1.24e-06)]_216_[+2(3.82e-13)]_51_[-1(2.24e-06)]_36_[-1(3.13e-08)]_5_\
++    [+2(5.85e-07)]_21_[+1(1.72e-07)]_61_[+2(6.20e-08)]_11
++OPI3                             9.38e-05  276_[+2(1.24e-06)]_93_\
++    [+2(5.54e-06)]_101_[+2(6.45e-06)]_26_[-1(2.44e-06)]_174_[-2(2.09e-06)]_1
+ --------------------------------------------------------------------------------
+ 
+ ********************************************************************************
+@@ -416,6 +424,6 @@
+ Stopped because nmotifs = 2 reached.
+ ********************************************************************************
+ 
+-CPU: tlb-sayonara.imb.uq.edu.au
++CPU: tlb-squirrel
+ 
+ ********************************************************************************
+diff -r 5836e70b6834 -r 81f90e1597b4 tests/meme/meme.INO_up800.zoops
+--- a/tests/meme/meme.INO_up800.zoops	Wed Feb 22 12:48:03 2012 +1000
++++ b/tests/meme/meme.INO_up800.zoops	Wed Feb 22 14:46:22 2012 +1000
+@@ -1,7 +1,7 @@
+ ********************************************************************************
+ MEME - Motif discovery tool
+ ********************************************************************************
+-MEME version 4.0.0 (Release date: 2008-07-12 05:23:09 +1000 (Sat, 12 Jul 2008))
++MEME version 4.8.1 (Release date: Wed Feb 22 11:51:06 EST 2012)
+ 
+ For further information on how to interpret these results or to get
+ a copy of the MEME software please access http://meme.nbcr.net.
+@@ -28,7 +28,7 @@
+ ********************************************************************************
+ TRAINING SET
+ ********************************************************************************
+-DATAFILE= /home/t.bailey/MEME/SVNROOT/trunk/scripts/../tests/common/INO_up800.s
++DATAFILE= /home/james/dist/scripts/../tests/common/INO_up800.s
+ ALPHABET= ACGT
+ Sequence name            Weight Length  Sequence name            Weight Length  
+ -------------            ------ ------  -------------            ------ ------  
+@@ -44,7 +44,7 @@
+ This information can also be useful in the event you wish to report a
+ problem with the MEME software.
+ 
+-command: meme /home/t.bailey/MEME/SVNROOT/trunk/scripts/../tests/common/INO_up800.s -text -mod zoops -dna -revcomp -bfile /home/t.bailey/MEME/SVNROOT/trunk/scripts/../tests/common/yeast.nc.6.freq -x_branch -nostatus -nmotifs 2 -minw 8 
++command: meme /home/james/dist/scripts/../tests/common/INO_up800.s -text -mod zoops -dna -revcomp -bfile /home/james/dist/scripts/../tests/common/yeast.nc.6.freq -x_branch -nostatus -nmotifs 2 -minw 8 
+ 
+ model:  mod=         zoops    nmotifs=         2    evt=           inf
+ object function=  E-value of product of p-values
+@@ -61,7 +61,7 @@
+ sample: seed=            0    seqfrac=         1
+ Letter frequencies in dataset:
+ A 0.304 C 0.196 G 0.196 T 0.304 
+-Background letter frequencies (from /home/t.bailey/MEME/SVNROOT/trunk/scripts/../tests/common/yeast.nc.6.freq):
++Background letter frequencies (from /home/james/dist/scripts/../tests/common/yeast.nc.6.freq):
+ A 0.324 C 0.176 G 0.176 T 0.324 
+ ********************************************************************************
+ 
+@@ -193,52 +193,51 @@
+ 
+ 
+ 
+-Time 31.59 secs.
++Time 23.07 secs.
+ 
+ ********************************************************************************
+ 
+ 
+ ********************************************************************************
+-MOTIF  2	width =   10   sites =   7   llr = 81   E-value = 4.4e+001
++MOTIF  2	width =   21   sites =   6   llr = 108   E-value = 8.3e+001
+ ********************************************************************************
+ --------------------------------------------------------------------------------
+ 	Motif 2 Description
+ --------------------------------------------------------------------------------
+-Simplified        A  ::31::a:6:
+-pos.-specific     C  :a:::a:911
+-probability       G  1::9a:::19
+-matrix            T  9:7::::11:
++Simplified        A  :85:2223:7::7::8:::::
++pos.-specific     C  8:32357382:8:852a2328
++probability       G  222853222:::322:::522
++matrix            T  :::::::2:2a2::3::827:
+ 
+-         bits    2.5  *  **    
+-                 2.3  *  **    
+-                 2.0  *  **   *
+-                 1.8  * *** * *
+-Relative         1.5  * ***** *
+-Entropy          1.3 ** ***** *
+-(16.8 bits)      1.0 ** ***** *
+-                 0.8 ******** *
+-                 0.5 ******** *
+-                 0.3 **********
+-                 0.0 ----------
++         bits    2.5                 *    
++                 2.3                 *    
++                 2.0                 *    
++                 1.8 *  *    *  * *  *   *
++Relative         1.5 *  *    * ** *  *   *
++Entropy          1.3 *  *    * ** *  *   *
++(26.0 bits)      1.0 ** **** * **** **** *
++                 0.8 ** **** * ***********
++                 0.5 ******* *************
++                 0.3 *********************
++                 0.0 ---------------------
+ 
+-Multilevel           TCTGGCACAG
+-consensus              A       
+-sequence                       
+-                               
++Multilevel           CAAGGCCACATCACCACTGTC
++consensus              C CG C    G T   C  
++sequence                                  
++                                          
+ --------------------------------------------------------------------------------
+ 
+ --------------------------------------------------------------------------------
+ 	Motif 2 sites sorted by position p-value
+ --------------------------------------------------------------------------------
+-Sequence name            Strand  Start   P-value               Site 
+--------------            ------  ----- ---------            ----------
+-OPI3                         -    186  3.28e-07 GAAAACCAGA TCTGGCACAG ACCGTTGTCA
+-ACC1                         +    232  3.28e-07 CCAGTCGTAT TCTGGCACAG TATAGCCTAG
+-CHO1                         -    559  3.28e-07 ATATTCAGTG TCTGGCACAG AAGTCTGCAC
+-FAS1                         +     44  5.16e-06 TACACGAGGT GCAGGCACGG TTCACTACTC
+-FAS2                         -    185  6.97e-06 TTCTTGCTTT TCTGGCACTC TTGACGGCTT
+-CHO2                         -    413  6.97e-06 TTTTGCCGTT TCTGGCATCG CCGTTCATTT
+-INO1                         +    332  8.18e-06 CAGAGGAATC TCAAGCACAG CCTCCAGCAT
++Sequence name            Strand  Start   P-value                    Site       
++-------------            ------  ----- ---------            ---------------------
++FAS2                         +    710  1.81e-11 GAAGGTTACA CAAGACCACATCACCACTGTC GTGCTTTTCT
++INO1                         -    369  5.01e-10 TGTTGTCCAT CAAGGGCACATCGGCACCGGC CTCATCGTCT
++OPI3                         -    504  8.36e-10 CGAATTATAC GGCGGCGCCATCACTACTGTC GTCCCACCTG
++ACC1                         +    135  5.28e-09 AGTCGAAATT CAACCGCTCATTGCCACTCTC TCTACTGCTT
++CHO1                         +    615  1.83e-08 TGAACGTTCA CACGGCACCCTCACGCCTTTG AGCTTTCACA
++FAS1                         +     45  2.47e-08 ACACGAGGTG CAGGCACGGTTCACTACTCCC CTGGCCTCCA
+ --------------------------------------------------------------------------------
+ 
+ --------------------------------------------------------------------------------
+@@ -246,26 +245,24 @@
+ --------------------------------------------------------------------------------
+ SEQUENCE NAME            POSITION P-VALUE  MOTIF DIAGRAM
+ -------------            ----------------  -------------
+-OPI3                              3.3e-07  185_[-2]_605
+-ACC1                              3.3e-07  231_[+2]_559
+-CHO1                              3.3e-07  558_[-2]_232
+-FAS1                              5.2e-06  43_[+2]_747
+-FAS2                                7e-06  184_[-2]_606
+-CHO2                                7e-06  412_[-2]_378
+-INO1                              8.2e-06  331_[+2]_459
++FAS2                              1.8e-11  709_[+2]_70
++INO1                                5e-10  368_[-2]_411
++OPI3                              8.4e-10  503_[-2]_276
++ACC1                              5.3e-09  134_[+2]_645
++CHO1                              1.8e-08  614_[+2]_165
++FAS1                              2.5e-08  44_[+2]_735
+ --------------------------------------------------------------------------------
+ 
+ --------------------------------------------------------------------------------
+ 	Motif 2 in BLOCKS format
+ --------------------------------------------------------------------------------
+-BL   MOTIF 2 width=10 seqs=7
+-OPI3                     (  186) TCTGGCACAG  1 
+-ACC1                     (  232) TCTGGCACAG  1 
+-CHO1                     (  559) TCTGGCACAG  1 
+-FAS1                     (   44) GCAGGCACGG  1 
+-FAS2                     (  185) TCTGGCACTC  1 
+-CHO2                     (  413) TCTGGCATCG  1 
+-INO1                     (  332) TCAAGCACAG  1 
++BL   MOTIF 2 width=21 seqs=6
++FAS2                     (  710) CAAGACCACATCACCACTGTC  1 
++INO1                     (  369) CAAGGGCACATCGGCACCGGC  1 
++OPI3                     (  504) GGCGGCGCCATCACTACTGTC  1 
++ACC1                     (  135) CAACCGCTCATTGCCACTCTC  1 
++CHO1                     (  615) CACGGCACCCTCACGCCTTTG  1 
++FAS1                     (   45) CAGGCACGGTTCACTACTCCC  1 
+ //
+ 
+ --------------------------------------------------------------------------------
+@@ -273,45 +270,67 @@
+ --------------------------------------------------------------------------------
+ 	Motif 2 position-specific scoring matrix
+ --------------------------------------------------------------------------------
+-log-odds matrix: alength= 4 w= 10 n= 5537 bayes= 10.2321 E= 4.4e+001 
+-  -945   -945    -30    140 
+-  -945    251   -945   -945 
+-   -18   -945   -945    114 
+-  -118   -945    229   -945 
+-  -945   -945    251   -945 
+-  -945    251   -945   -945 
+-   162   -945   -945   -945 
+-  -945    229   -945   -118 
+-    82    -30    -30   -118 
+-  -945    -30    229   -945 
++log-odds matrix: alength= 4 w= 21 n= 5460 bayes= 10.276 E= 8.3e+001 
++  -923    224     -7   -923 
++   136   -923     -7   -923 
++    62     92     -7   -923 
++  -923     -7    224   -923 
++   -96     92    151   -923 
++   -96    151     92   -923 
++   -96    192     -7   -923 
++     4     92     -7    -96 
++  -923    224     -7   -923 
++   104     -7   -923    -96 
++  -923   -923   -923    162 
++  -923    224   -923    -96 
++   104   -923     92   -923 
++  -923    224     -7   -923 
++  -923    151     -7      4 
++   136     -7   -923   -923 
++  -923    251   -923   -923 
++  -923     -7   -923    136 
++  -923     92    151    -96 
++  -923     -7     -7    104 
++  -923    224     -7   -923 
+ --------------------------------------------------------------------------------
+ 
+ --------------------------------------------------------------------------------
+ 	Motif 2 position-specific probability matrix
+ --------------------------------------------------------------------------------
+-letter-probability matrix: alength= 4 w= 10 nsites= 7 E= 4.4e+001 
+- 0.000000  0.000000  0.142857  0.857143 
++letter-probability matrix: alength= 4 w= 21 nsites= 6 E= 8.3e+001 
++ 0.000000  0.833333  0.166667  0.000000 
++ 0.833333  0.000000  0.166667  0.000000 
++ 0.500000  0.333333  0.166667  0.000000 
++ 0.000000  0.166667  0.833333  0.000000 
++ 0.166667  0.333333  0.500000  0.000000 
++ 0.166667  0.500000  0.333333  0.000000 
++ 0.166667  0.666667  0.166667  0.000000 
++ 0.333333  0.333333  0.166667  0.166667 
++ 0.000000  0.833333  0.166667  0.000000 
++ 0.666667  0.166667  0.000000  0.166667 
++ 0.000000  0.000000  0.000000  1.000000 
++ 0.000000  0.833333  0.000000  0.166667 
++ 0.666667  0.000000  0.333333  0.000000 
++ 0.000000  0.833333  0.166667  0.000000 
++ 0.000000  0.500000  0.166667  0.333333 
++ 0.833333  0.166667  0.000000  0.000000 
+  0.000000  1.000000  0.000000  0.000000 
+- 0.285714  0.000000  0.000000  0.714286 
+- 0.142857  0.000000  0.857143  0.000000 
+- 0.000000  0.000000  1.000000  0.000000 
+- 0.000000  1.000000  0.000000  0.000000 
+- 1.000000  0.000000  0.000000  0.000000 
+- 0.000000  0.857143  0.000000  0.142857 
+- 0.571429  0.142857  0.142857  0.142857 
+- 0.000000  0.142857  0.857143  0.000000 
++ 0.000000  0.166667  0.000000  0.833333 
++ 0.000000  0.333333  0.500000  0.166667 
++ 0.000000  0.166667  0.166667  0.666667 
++ 0.000000  0.833333  0.166667  0.000000 
+ --------------------------------------------------------------------------------
+ 
+ --------------------------------------------------------------------------------
+ 	Motif 2 regular expression
+ --------------------------------------------------------------------------------
+-TC[TA]GGCACAG
++CA[AC]G[GC][CG]C[AC]CATC[AG]C[CT]ACT[GC]TC
+ --------------------------------------------------------------------------------
+ 
+ 
+ 
+ 
+-Time 62.82 secs.
++Time 45.81 secs.
+ 
+ ********************************************************************************
+ 
+@@ -325,13 +344,19 @@
+ --------------------------------------------------------------------------------
+ SEQUENCE NAME            COMBINED P-VALUE  MOTIF DIAGRAM
+ -------------            ----------------  -------------
+-CHO1                             1.89e-07  558_[-2(3.28e-07)]_38_[-1(2.43e-05)]_12_[-1(1.20e-08)]_148
+-CHO2                             1.91e-06  349_[-1(6.52e-09)]_46_[-2(6.97e-06)]_378
+-FAS1                             1.35e-06  43_[+2(5.16e-06)]_37_[-1(6.11e-09)]_693
+-FAS2                             1.45e-05  184_[-2(6.97e-06)]_368_[-1(5.67e-08)]_221
+-ACC1                             1.89e-07  78_[-1(1.20e-08)]_136_[+2(3.28e-07)]_559
+-INO1                             1.82e-07  331_[+2(8.18e-06)]_207_[+1(9.62e-05)]_4_[+1(5.31e-05)]_32_[+1(4.64e-10)]_165
+-OPI3                             5.70e-07  185_[-2(3.28e-07)]_388_[+1(3.84e-08)]_32_[-1(3.61e-05)]_151
++CHO1                             1.20e-08  614_[+2(1.83e-08)]_[-1(1.20e-08)]_\
++    148
++CHO2                             9.89e-05  349_[-1(6.52e-09)]_434
++FAS1                             8.38e-09  44_[+2(2.47e-08)]_25_[-1(6.11e-09)]_\
++    16_[-2(5.76e-05)]_656
++FAS2                             6.93e-11  562_[-1(5.67e-08)]_130_\
++    [+2(1.81e-11)]_70
++ACC1                             3.64e-09  34_[+2(3.28e-05)]_[+2(7.06e-05)]_2_\
++    [-1(1.20e-08)]_39_[+2(5.28e-09)]_645
++INO1                             1.66e-11  239_[-2(8.16e-05)]_108_\
++    [-2(5.01e-10)]_159_[+1(9.62e-05)]_4_[+1(5.31e-05)]_32_[+1(4.64e-10)]_165
++OPI3                             1.90e-09  503_[-2(8.36e-10)]_59_\
++    [+1(3.84e-08)]_32_[-1(3.61e-05)]_151
+ --------------------------------------------------------------------------------
+ 
+ ********************************************************************************
+@@ -341,6 +366,6 @@
+ Stopped because nmotifs = 2 reached.
+ ********************************************************************************
+ 
+-CPU: tlb-sayonara.imb.uq.edu.au
++CPU: tlb-squirrel
+ 
+ ********************************************************************************
+diff -r 5836e70b6834 -r 81f90e1597b4 tests/meme/meme.adh.oops
+--- a/tests/meme/meme.adh.oops	Wed Feb 22 12:48:03 2012 +1000
++++ b/tests/meme/meme.adh.oops	Wed Feb 22 14:46:22 2012 +1000
+@@ -1,7 +1,7 @@
+ ********************************************************************************
+ MEME - Motif discovery tool
+ ********************************************************************************
+-MEME version 4.0.0 (Release date: 2008-07-12 05:23:09 +1000 (Sat, 12 Jul 2008))
++MEME version 4.8.1 (Release date: Wed Feb 22 11:51:06 EST 2012)
+ 
+ For further information on how to interpret these results or to get
+ a copy of the MEME software please access http://meme.nbcr.net.
+@@ -28,7 +28,7 @@
+ ********************************************************************************
+ TRAINING SET
+ ********************************************************************************
+-DATAFILE= /home/t.bailey/MEME/SVNROOT/trunk/scripts/../tests/common/adh.s
++DATAFILE= /home/james/dist/scripts/../tests/common/adh.s
+ ALPHABET= ACDEFGHIKLMNPQRSTVWY
+ Sequence name            Weight Length  Sequence name            Weight Length  
+ -------------            ------ ------  -------------            ------ ------  
+@@ -57,7 +57,7 @@
+ This information can also be useful in the event you wish to report a
+ problem with the MEME software.
+ 
+-command: meme /home/t.bailey/MEME/SVNROOT/trunk/scripts/../tests/common/adh.s -text -mod oops -protein -nostatus -nmotifs 2 -minw 8 
++command: meme /home/james/dist/scripts/../tests/common/adh.s -text -mod oops -protein -nostatus -nmotifs 2 -minw 8 
+ 
+ model:  mod=          oops    nmotifs=         2    evt=           inf
+ object function=  E-value of product of p-values
+@@ -329,7 +329,7 @@
+ 
+ 
+ 
+-Time 10.13 secs.
++Time  7.53 secs.
+ 
+ ********************************************************************************
+ 
+@@ -580,7 +580,7 @@
+ 
+ 
+ 
+-Time 18.80 secs.
++Time 13.78 secs.
+ 
+ ********************************************************************************
+ 
+@@ -594,39 +594,71 @@
+ --------------------------------------------------------------------------------
+ SEQUENCE NAME            COMBINED P-VALUE  MOTIF DIAGRAM
+ -------------            ----------------  -------------
+-2BHD_STREX                       2.28e-28  6_[2(6.13e-17)]_116_[1(1.05e-18)]_75
+-3BHD_COMTE                       1.13e-24  6_[2(4.59e-17)]_115_[1(8.09e-15)]_74
+-ADH_DROME                        3.17e-15  6_[2(2.82e-10)]_116_[1(5.74e-12)]_75
+-AP27_MOUSE                       1.27e-33  7_[2(4.83e-19)]_112_[1(6.97e-22)]_67
+-BA72_EUBSP                       4.12e-26  6_[2(5.57e-17)]_121_[1(2.38e-16)]_64
+-BDH_HUMAN                        1.56e-26  55_[2(2.83e-17)]_123_[1(8.60e-17)]_107
+-BPHB_PSEPS                       4.63e-19  5_[2(8.10e-14)]_118_[1(1.99e-12)]_94
+-BUDC_KLETE                       9.67e-34  2_[2(6.81e-20)]_120_[1(3.84e-21)]_61
+-DHES_HUMAN                       1.54e-22  2_[2(2.17e-13)]_50_[2(9.48e-05)]_44_[1(1.44e-16)]_144
+-DHGB_BACME                       9.81e-31  7_[2(3.38e-18)]_123_[1(7.13e-20)]_74
+-DHII_HUMAN                       7.97e-30  34_[2(8.59e-22)]_119_[1(1.84e-15)]_81
+-DHMA_FLAS1                       1.83e-28  14_[2(7.71e-18)]_121_[1(5.86e-18)]_77
+-ENTA_ECOLI                       2.86e-27  5_[2(4.83e-19)]_109_[1(1.84e-15)]_76
+-FIXR_BRAJA                       3.97e-30  36_[2(1.30e-16)]_123_[1(6.66e-21)]_61
+-GUTD_ECOLI                       4.48e-25  2_[2(3.39e-13)]_122_[1(4.04e-19)]_77
+-HDE_CANTR                        3.35e-32  8_[2(4.61e-18)]_125_[1(4.12e-13)]_131_[2(6.11e-23)]_115_[1(9.13e-18)]_411
+-HDHA_ECOLI                       3.52e-31  11_[2(7.67e-20)]_74_[1(4.12e-05)]_15_[1(1.18e-18)]_68
+-LIGD_PSEPA                       5.00e-24  6_[2(8.02e-16)]_121_[1(1.38e-15)]_120
+-NODG_RHIME                       7.67e-30  6_[2(2.09e-15)]_116_[1(1.08e-21)]_65
+-RIDH_KLEAE                       6.22e-29  14_[2(1.55e-19)]_116_[1(1.17e-16)]_61
+-YINL_LISMO                       1.11e-28  5_[2(9.87e-22)]_119_[1(3.35e-14)]_66
+-YRTP_BACSU                       5.30e-34  6_[2(9.36e-19)]_119_[1(1.57e-22)]_55
++2BHD_STREX                       2.28e-28  6_[2(6.13e-17)]_116_[1(1.05e-18)]_\
++    75
++3BHD_COMTE                       1.13e-24  6_[2(4.59e-17)]_115_[1(8.09e-15)]_\
++    74
++ADH_DROME                        3.17e-15  6_[2(2.82e-10)]_116_[1(5.74e-12)]_\
++    75
++AP27_MOUSE                       1.27e-33  7_[2(4.83e-19)]_112_[1(6.97e-22)]_\
++    67
++BA72_EUBSP                       4.12e-26  6_[2(5.57e-17)]_121_[1(2.38e-16)]_\
++    64
++BDH_HUMAN                        1.56e-26  55_[2(2.83e-17)]_123_[1(8.60e-17)]_\
++    107
++BPHB_PSEPS                       4.63e-19  5_[2(8.10e-14)]_118_[1(1.99e-12)]_\
++    94
++BUDC_KLETE                       9.67e-34  2_[2(6.81e-20)]_120_[1(3.84e-21)]_\
++    61
++DHES_HUMAN                       1.54e-22  2_[2(2.17e-13)]_50_[2(9.48e-05)]_44_\
++    [1(1.44e-16)]_144
++DHGB_BACME                       9.81e-31  7_[2(3.38e-18)]_123_[1(7.13e-20)]_\
++    74
++DHII_HUMAN                       7.97e-30  34_[2(8.59e-22)]_119_[1(1.84e-15)]_\
++    81
++DHMA_FLAS1                       1.83e-28  14_[2(7.71e-18)]_121_[1(5.86e-18)]_\
++    77
++ENTA_ECOLI                       2.86e-27  5_[2(4.83e-19)]_109_[1(1.84e-15)]_\
++    76
++FIXR_BRAJA                       3.97e-30  36_[2(1.30e-16)]_123_[1(6.66e-21)]_\
++    61
++GUTD_ECOLI                       4.48e-25  2_[2(3.39e-13)]_122_[1(4.04e-19)]_\
++    77
++HDE_CANTR                        3.35e-32  8_[2(4.61e-18)]_125_[1(4.12e-13)]_\
++    131_[2(6.11e-23)]_115_[1(9.13e-18)]_411
++HDHA_ECOLI                       3.52e-31  11_[2(7.67e-20)]_74_[1(4.12e-05)]_\
++    15_[1(1.18e-18)]_68
++LIGD_PSEPA                       5.00e-24  6_[2(8.02e-16)]_121_[1(1.38e-15)]_\
++    120
++NODG_RHIME                       7.67e-30  6_[2(2.09e-15)]_116_[1(1.08e-21)]_\
++    65
++RIDH_KLEAE                       6.22e-29  14_[2(1.55e-19)]_116_[1(1.17e-16)]_\
++    61
++YINL_LISMO                       1.11e-28  5_[2(9.87e-22)]_119_[1(3.35e-14)]_\
++    66
++YRTP_BACSU                       5.30e-34  6_[2(9.36e-19)]_119_[1(1.57e-22)]_\
++    55
+ CSGA_MYXXA                       8.09e-13  [2(7.14e-07)]_58_[1(1.84e-12)]_50
+-DHB2_HUMAN                       3.48e-27  82_[2(1.72e-16)]_120_[1(2.37e-18)]_127
+-DHB3_HUMAN                       1.32e-25  48_[2(2.74e-18)]_120_[1(9.70e-15)]_84
+-DHCA_HUMAN                       1.29e-17  4_[2(1.12e-14)]_159_[1(4.30e-10)]_55
+-FABI_ECOLI                       2.56e-14  6_[2(2.85e-09)]_123_[1(4.59e-12)]_75
+-FVT1_HUMAN                       3.36e-26  32_[2(1.89e-16)]_124_[1(3.01e-17)]_118
+-HMTR_LEIMA                       1.32e-28  6_[2(8.96e-17)]_157_[1(3.17e-19)]_66
+-MAS1_AGRRA                       3.85e-15  245_[2(8.72e-15)]_74_[1(5.81e-08)]_99
+-PCR_PEA                          7.86e-19  25_[1(2.66e-08)]_32_[2(4.61e-18)]_284
+-RFBB_NEIGO                       8.85e-20  6_[2(1.08e-12)]_129_[1(1.66e-14)]_153
+-YURA_MYXXA                       5.81e-20  65_[2(3.85e-08)]_65_[1(5.80e-19)]_70
++DHB2_HUMAN                       3.48e-27  82_[2(1.72e-16)]_120_[1(2.37e-18)]_\
++    127
++DHB3_HUMAN                       1.32e-25  48_[2(2.74e-18)]_120_[1(9.70e-15)]_\
++    84
++DHCA_HUMAN                       1.29e-17  4_[2(1.12e-14)]_159_[1(4.30e-10)]_\
++    55
++FABI_ECOLI                       2.56e-14  6_[2(2.85e-09)]_123_[1(4.59e-12)]_\
++    75
++FVT1_HUMAN                       3.36e-26  32_[2(1.89e-16)]_124_[1(3.01e-17)]_\
++    118
++HMTR_LEIMA                       1.32e-28  6_[2(8.96e-17)]_157_[1(3.17e-19)]_\
++    66
++MAS1_AGRRA                       3.85e-15  245_[2(8.72e-15)]_74_[1(5.81e-08)]_\
++    99
++PCR_PEA                          7.86e-19  25_[1(2.66e-08)]_32_[2(4.61e-18)]_\
++    284
++RFBB_NEIGO                       8.85e-20  6_[2(1.08e-12)]_129_[1(1.66e-14)]_\
++    153
++YURA_MYXXA                       5.81e-20  65_[2(3.85e-08)]_65_[1(5.80e-19)]_\
++    70
+ --------------------------------------------------------------------------------
+ 
+ ********************************************************************************
+@@ -636,6 +668,6 @@
+ Stopped because nmotifs = 2 reached.
+ ********************************************************************************
+ 
+-CPU: tlb-sayonara.imb.uq.edu.au
++CPU: tlb-squirrel
+ 
+ ********************************************************************************
+diff -r 5836e70b6834 -r 81f90e1597b4 tests/meme/meme.adh.tcm
+--- a/tests/meme/meme.adh.tcm	Wed Feb 22 12:48:03 2012 +1000
++++ b/tests/meme/meme.adh.tcm	Wed Feb 22 14:46:22 2012 +1000
+@@ -1,7 +1,7 @@
+ ********************************************************************************
+ MEME - Motif discovery tool
+ ********************************************************************************
+-MEME version 4.0.0 (Release date: 2008-07-12 05:23:09 +1000 (Sat, 12 Jul 2008))
++MEME version 4.8.1 (Release date: Wed Feb 22 11:51:06 EST 2012)
+ 
+ For further information on how to interpret these results or to get
+ a copy of the MEME software please access http://meme.nbcr.net.
+@@ -28,7 +28,7 @@
+ ********************************************************************************
+ TRAINING SET
+ ********************************************************************************
+-DATAFILE= /home/t.bailey/MEME/SVNROOT/trunk/scripts/../tests/common/adh.s
++DATAFILE= /home/james/dist/scripts/../tests/common/adh.s
+ ALPHABET= ACDEFGHIKLMNPQRSTVWY
+ Sequence name            Weight Length  Sequence name            Weight Length  
+ -------------            ------ ------  -------------            ------ ------  
+@@ -57,7 +57,7 @@
+ This information can also be useful in the event you wish to report a
+ problem with the MEME software.
+ 
+-command: meme /home/t.bailey/MEME/SVNROOT/trunk/scripts/../tests/common/adh.s -text -mod tcm -protein -nostatus -nmotifs 2 -minw 8 
++command: meme /home/james/dist/scripts/../tests/common/adh.s -text -mod tcm -protein -nostatus -nmotifs 2 -minw 8 
+ 
+ model:  mod=           tcm    nmotifs=         2    evt=           inf
+ object function=  E-value of product of p-values
+@@ -303,7 +303,7 @@
+ 
+ 
+ 
+-Time 49.60 secs.
++Time 35.85 secs.
+ 
+ ********************************************************************************
+ 
+@@ -533,7 +533,7 @@
+ 
+ 
+ 
+-Time 93.45 secs.
++Time 67.40 secs.
+ 
+ ********************************************************************************
+ 
+@@ -547,38 +547,67 @@
+ --------------------------------------------------------------------------------
+ SEQUENCE NAME            COMBINED P-VALUE  MOTIF DIAGRAM
+ -------------            ----------------  -------------
+-2BHD_STREX                       6.22e-18  9_[1(8.69e-12)]_121_[2(2.93e-13)]_82
+-3BHD_COMTE                       3.89e-20  9_[1(9.74e-13)]_120_[2(1.49e-14)]_81
+-ADH_DROME                        3.06e-09  9_[1(2.60e-05)]_121_[2(9.02e-11)]_82
+-AP27_MOUSE                       1.05e-24  10_[1(2.80e-15)]_117_[2(1.24e-16)]_74
+-BA72_EUBSP                       3.85e-19  9_[1(9.22e-14)]_126_[2(1.69e-12)]_71
+-BDH_HUMAN                        3.49e-20  58_[1(6.84e-15)]_128_[2(9.88e-13)]_114
+-BPHB_PSEPS                       3.97e-21  8_[1(4.99e-13)]_123_[2(2.37e-15)]_101
+-BUDC_KLETE                       4.93e-27  5_[1(2.50e-17)]_125_[2(6.17e-17)]_68
+-DHES_HUMAN                       3.43e-21  5_[1(5.43e-13)]_128_[2(1.29e-15)]_151
+-DHGB_BACME                       1.08e-19  10_[1(2.56e-12)]_128_[2(1.49e-14)]_81
+-DHII_HUMAN                       4.91e-23  37_[1(1.32e-16)]_124_[2(8.96e-14)]_88
+-DHMA_FLAS1                       1.77e-20  17_[1(6.96e-14)]_126_[2(8.10e-14)]_84
+-ENTA_ECOLI                       7.63e-20  8_[1(1.98e-15)]_114_[2(1.52e-11)]_83
+-FIXR_BRAJA                       2.11e-22  39_[1(7.62e-15)]_128_[2(7.61e-15)]_68
+-GUTD_ECOLI                       2.74e-18  5_[1(4.49e-10)]_127_[2(2.37e-15)]_84
+-HDE_CANTR                        1.12e-21  11_[1(1.01e-13)]_130_[2(6.24e-13)]_141_[1(4.49e-16)]_120_[2(5.95e-14)]_418
+-HDHA_ECOLI                       6.08e-21  14_[1(5.50e-15)]_123_[2(3.90e-13)]_75
+-LIGD_PSEPA                       2.75e-16  9_[1(3.19e-11)]_126_[2(2.63e-12)]_127
+-NODG_RHIME                       1.74e-22  9_[1(1.33e-13)]_121_[2(4.70e-16)]_72
+-RIDH_KLEAE                       5.89e-20  17_[1(3.86e-13)]_121_[2(5.95e-14)]_68
+-YINL_LISMO                       3.49e-24  8_[1(2.12e-17)]_124_[2(5.37e-14)]_73
+-YRTP_BACSU                       7.95e-30  9_[1(3.13e-18)]_124_[2(7.44e-19)]_62
++2BHD_STREX                       6.22e-18  9_[1(8.69e-12)]_121_[2(2.93e-13)]_\
++    82
++3BHD_COMTE                       3.89e-20  9_[1(9.74e-13)]_120_[2(1.49e-14)]_\
++    81
++ADH_DROME                        3.06e-09  9_[1(2.60e-05)]_121_[2(9.02e-11)]_\
++    82
++AP27_MOUSE                       1.05e-24  10_[1(2.80e-15)]_117_[2(1.24e-16)]_\
++    74
++BA72_EUBSP                       3.85e-19  9_[1(9.22e-14)]_126_[2(1.69e-12)]_\
++    71
++BDH_HUMAN                        3.49e-20  58_[1(6.84e-15)]_128_[2(9.88e-13)]_\
++    114
++BPHB_PSEPS                       3.97e-21  8_[1(4.99e-13)]_123_[2(2.37e-15)]_\
++    101
++BUDC_KLETE                       4.93e-27  5_[1(2.50e-17)]_125_[2(6.17e-17)]_\
++    68
++DHES_HUMAN                       3.43e-21  5_[1(5.43e-13)]_128_[2(1.29e-15)]_\
++    151
++DHGB_BACME                       1.08e-19  10_[1(2.56e-12)]_128_[2(1.49e-14)]_\
++    81
++DHII_HUMAN                       4.91e-23  37_[1(1.32e-16)]_124_[2(8.96e-14)]_\
++    88
++DHMA_FLAS1                       1.77e-20  17_[1(6.96e-14)]_126_[2(8.10e-14)]_\
++    84
++ENTA_ECOLI                       7.63e-20  8_[1(1.98e-15)]_114_[2(1.52e-11)]_\
++    83
++FIXR_BRAJA                       2.11e-22  39_[1(7.62e-15)]_128_[2(7.61e-15)]_\
++    68
++GUTD_ECOLI                       2.74e-18  5_[1(4.49e-10)]_127_[2(2.37e-15)]_\
++    84
++HDE_CANTR                        1.12e-21  11_[1(1.01e-13)]_130_[2(6.24e-13)]_\
++    141_[1(4.49e-16)]_120_[2(5.95e-14)]_418
++HDHA_ECOLI                       6.08e-21  14_[1(5.50e-15)]_123_[2(3.90e-13)]_\
++    75
++LIGD_PSEPA                       2.75e-16  9_[1(3.19e-11)]_126_[2(2.63e-12)]_\
++    127
++NODG_RHIME                       1.74e-22  9_[1(1.33e-13)]_121_[2(4.70e-16)]_\
++    72
++RIDH_KLEAE                       5.89e-20  17_[1(3.86e-13)]_121_[2(5.95e-14)]_\
++    68
++YINL_LISMO                       3.49e-24  8_[1(2.12e-17)]_124_[2(5.37e-14)]_\
++    73
++YRTP_BACSU                       7.95e-30  9_[1(3.13e-18)]_124_[2(7.44e-19)]_\
++    62
+ CSGA_MYXXA                       1.91e-09  87_[2(2.87e-12)]_57
+-DHB2_HUMAN                       4.77e-21  85_[1(5.76e-14)]_125_[2(1.19e-14)]_134
+-DHB3_HUMAN                       4.47e-21  51_[1(2.91e-14)]_125_[2(3.53e-14)]_91
+-DHCA_HUMAN                       1.16e-12  7_[1(3.24e-13)]_164_[2(1.72e-06)]_62
++DHB2_HUMAN                       4.77e-21  85_[1(5.76e-14)]_125_[2(1.19e-14)]_\
++    134
++DHB3_HUMAN                       4.47e-21  51_[1(2.91e-14)]_125_[2(3.53e-14)]_\
++    91
++DHCA_HUMAN                       1.16e-12  7_[1(3.24e-13)]_164_[2(1.72e-06)]_\
++    62
+ FABI_ECOLI                       1.39e-06  158_[2(8.74e-09)]_82
+-FVT1_HUMAN                       1.46e-25  35_[1(1.09e-15)]_129_[2(2.23e-17)]_125
+-HMTR_LEIMA                       3.90e-21  9_[1(1.11e-13)]_162_[2(9.54e-15)]_73
+-MAS1_AGRRA                       6.26e-11  248_[1(8.26e-13)]_122_[2(1.32e-05)]_63
++FVT1_HUMAN                       1.46e-25  35_[1(1.09e-15)]_129_[2(2.23e-17)]_\
++    125
++HMTR_LEIMA                       3.90e-21  9_[1(1.11e-13)]_162_[2(9.54e-15)]_\
++    73
++MAS1_AGRRA                       6.26e-11  248_[1(8.26e-13)]_122_[2(1.32e-05)]_\
++    63
+ PCR_PEA                          2.93e-12  89_[1(6.60e-16)]_289
+-RFBB_NEIGO                       4.00e-16  9_[1(9.53e-11)]_134_[2(9.88e-13)]_160
++RFBB_NEIGO                       4.00e-16  9_[1(9.53e-11)]_134_[2(9.88e-13)]_\
++    160
+ YURA_MYXXA                       5.03e-11  159_[2(1.85e-14)]_77
+ --------------------------------------------------------------------------------
+ 
+@@ -589,6 +618,6 @@
+ Stopped because nmotifs = 2 reached.
+ ********************************************************************************
+ 
+-CPU: tlb-sayonara.imb.uq.edu.au
++CPU: tlb-squirrel
+ 
+ ********************************************************************************
+diff -r 5836e70b6834 -r 81f90e1597b4 tests/meme/meme.adh.zoops
+--- a/tests/meme/meme.adh.zoops	Wed Feb 22 12:48:03 2012 +1000
++++ b/tests/meme/meme.adh.zoops	Wed Feb 22 14:46:22 2012 +1000
+@@ -1,7 +1,7 @@
+ ********************************************************************************
+ MEME - Motif discovery tool
+ ********************************************************************************
+-MEME version 4.0.0 (Release date: 2008-07-12 05:23:09 +1000 (Sat, 12 Jul 2008))
++MEME version 4.8.1 (Release date: Wed Feb 22 11:51:06 EST 2012)
+ 
+ For further information on how to interpret these results or to get
+ a copy of the MEME software please access http://meme.nbcr.net.
+@@ -28,7 +28,7 @@
+ ********************************************************************************
+ TRAINING SET
+ ********************************************************************************
+-DATAFILE= /home/t.bailey/MEME/SVNROOT/trunk/scripts/../tests/common/adh.s
++DATAFILE= /home/james/dist/scripts/../tests/common/adh.s
+ ALPHABET= ACDEFGHIKLMNPQRSTVWY
+ Sequence name            Weight Length  Sequence name            Weight Length  
+ -------------            ------ ------  -------------            ------ ------  
+@@ -57,7 +57,7 @@
+ This information can also be useful in the event you wish to report a
+ problem with the MEME software.
+ 
+-command: meme /home/t.bailey/MEME/SVNROOT/trunk/scripts/../tests/common/adh.s -text -mod zoops -protein -nostatus -nmotifs 2 -minw 8 
++command: meme /home/james/dist/scripts/../tests/common/adh.s -text -mod zoops -protein -nostatus -nmotifs 2 -minw 8 
+ 
+ model:  mod=         zoops    nmotifs=         2    evt=           inf
+ object function=  E-value of product of p-values
+@@ -307,7 +307,7 @@
+ 
+ 
+ 
+-Time 34.89 secs.
++Time 25.96 secs.
+ 
+ ********************************************************************************
+ 
+@@ -552,7 +552,7 @@
+ 
+ 
+ 
+-Time 66.47 secs.
++Time 50.08 secs.
+ 
+ ********************************************************************************
+ 
+@@ -566,38 +566,68 @@
+ --------------------------------------------------------------------------------
+ SEQUENCE NAME            COMBINED P-VALUE  MOTIF DIAGRAM
+ -------------            ----------------  -------------
+-2BHD_STREX                       4.01e-24  5_[1(2.25e-12)]_123_[2(5.67e-19)]_77
+-3BHD_COMTE                       1.55e-22  5_[1(1.40e-14)]_122_[2(3.82e-15)]_76
+-ADH_DROME                        3.21e-15  5_[1(8.02e-10)]_123_[2(1.98e-12)]_77
+-AP27_MOUSE                       2.89e-27  6_[1(5.19e-14)]_119_[2(1.74e-20)]_69
+-BA72_EUBSP                       1.55e-22  5_[1(5.72e-14)]_128_[2(9.68e-16)]_66
+-BDH_HUMAN                        7.00e-24  54_[1(1.02e-14)]_130_[2(1.15e-16)]_109
+-BPHB_PSEPS                       1.49e-19  4_[1(1.12e-13)]_125_[2(4.38e-13)]_96
+-BUDC_KLETE                       4.14e-33  1_[1(5.79e-18)]_127_[2(1.90e-22)]_63
+-DHES_HUMAN                       5.57e-23  1_[1(6.94e-14)]_130_[2(1.55e-16)]_146
+-DHGB_BACME                       1.35e-26  6_[1(1.91e-14)]_130_[2(1.93e-19)]_76
+-DHII_HUMAN                       7.48e-26  33_[1(6.51e-17)]_126_[2(2.54e-16)]_83
+-DHMA_FLAS1                       3.81e-25  13_[1(2.59e-14)]_128_[2(3.96e-18)]_79
+-ENTA_ECOLI                       2.09e-24  4_[1(2.19e-16)]_116_[2(3.19e-15)]_78
+-FIXR_BRAJA                       9.83e-29  35_[1(4.81e-15)]_130_[2(4.54e-21)]_63
+-GUTD_ECOLI                       6.43e-22  1_[1(1.44e-09)]_129_[2(1.51e-19)]_79
+-HDE_CANTR                        7.21e-26  7_[1(9.67e-13)]_132_[2(1.71e-13)]_132_[1(1.92e-16)]_122_[2(7.66e-18)]_413
+-HDHA_ECOLI                       4.92e-27  10_[1(1.10e-15)]_125_[2(1.28e-18)]_70
+-LIGD_PSEPA                       1.73e-19  5_[1(6.98e-12)]_128_[2(6.52e-15)]_122
+-NODG_RHIME                       6.76e-26  5_[1(3.68e-12)]_123_[2(5.97e-21)]_67
+-RIDH_KLEAE                       2.61e-25  13_[1(2.47e-15)]_123_[2(3.39e-17)]_63
+-YINL_LISMO                       9.60e-26  4_[1(1.50e-17)]_126_[2(2.03e-15)]_68
+-YRTP_BACSU                       4.03e-33  5_[1(1.68e-16)]_126_[2(6.53e-24)]_57
++2BHD_STREX                       4.01e-24  5_[1(2.25e-12)]_123_[2(5.67e-19)]_\
++    77
++3BHD_COMTE                       1.55e-22  5_[1(1.40e-14)]_122_[2(3.82e-15)]_\
++    76
++ADH_DROME                        3.21e-15  5_[1(8.02e-10)]_123_[2(1.98e-12)]_\
++    77
++AP27_MOUSE                       2.89e-27  6_[1(5.19e-14)]_119_[2(1.74e-20)]_\
++    69
++BA72_EUBSP                       1.55e-22  5_[1(5.72e-14)]_128_[2(9.68e-16)]_\
++    66
++BDH_HUMAN                        7.00e-24  54_[1(1.02e-14)]_130_[2(1.15e-16)]_\
++    109
++BPHB_PSEPS                       1.49e-19  4_[1(1.12e-13)]_125_[2(4.38e-13)]_\
++    96
++BUDC_KLETE                       4.14e-33  1_[1(5.79e-18)]_127_[2(1.90e-22)]_\
++    63
++DHES_HUMAN                       5.57e-23  1_[1(6.94e-14)]_130_[2(1.55e-16)]_\
++    146
++DHGB_BACME                       1.35e-26  6_[1(1.91e-14)]_130_[2(1.93e-19)]_\
++    76
++DHII_HUMAN                       7.48e-26  33_[1(6.51e-17)]_126_[2(2.54e-16)]_\
++    83
++DHMA_FLAS1                       3.81e-25  13_[1(2.59e-14)]_128_[2(3.96e-18)]_\
++    79
++ENTA_ECOLI                       2.09e-24  4_[1(2.19e-16)]_116_[2(3.19e-15)]_\
++    78
++FIXR_BRAJA                       9.83e-29  35_[1(4.81e-15)]_130_[2(4.54e-21)]_\
++    63
++GUTD_ECOLI                       6.43e-22  1_[1(1.44e-09)]_129_[2(1.51e-19)]_\
++    79
++HDE_CANTR                        7.21e-26  7_[1(9.67e-13)]_132_[2(1.71e-13)]_\
++    132_[1(1.92e-16)]_122_[2(7.66e-18)]_413
++HDHA_ECOLI                       4.92e-27  10_[1(1.10e-15)]_125_[2(1.28e-18)]_\
++    70
++LIGD_PSEPA                       1.73e-19  5_[1(6.98e-12)]_128_[2(6.52e-15)]_\
++    122
++NODG_RHIME                       6.76e-26  5_[1(3.68e-12)]_123_[2(5.97e-21)]_\
++    67
++RIDH_KLEAE                       2.61e-25  13_[1(2.47e-15)]_123_[2(3.39e-17)]_\
++    63
++YINL_LISMO                       9.60e-26  4_[1(1.50e-17)]_126_[2(2.03e-15)]_\
++    68
++YRTP_BACSU                       4.03e-33  5_[1(1.68e-16)]_126_[2(6.53e-24)]_\
++    57
+ CSGA_MYXXA                       2.96e-09  85_[2(1.01e-12)]_52
+-DHB2_HUMAN                       9.06e-26  81_[1(3.09e-15)]_127_[2(3.54e-18)]_129
+-DHB3_HUMAN                       1.11e-21  47_[1(4.26e-14)]_127_[2(5.97e-15)]_86
+-DHCA_HUMAN                       4.21e-18  3_[1(1.91e-14)]_166_[2(7.76e-11)]_57
+-FABI_ECOLI                       1.11e-14  5_[1(2.70e-09)]_130_[2(1.98e-12)]_77
+-FVT1_HUMAN                       5.86e-25  31_[1(2.86e-14)]_131_[2(3.54e-18)]_120
+-HMTR_LEIMA                       1.11e-23  5_[1(6.98e-12)]_164_[2(3.97e-19)]_68
+-MAS1_AGRRA                       5.88e-10  244_[1(3.13e-12)]_124_[2(3.64e-05)]_58
++DHB2_HUMAN                       9.06e-26  81_[1(3.09e-15)]_127_[2(3.54e-18)]_\
++    129
++DHB3_HUMAN                       1.11e-21  47_[1(4.26e-14)]_127_[2(5.97e-15)]_\
++    86
++DHCA_HUMAN                       4.21e-18  3_[1(1.91e-14)]_166_[2(7.76e-11)]_\
++    57
++FABI_ECOLI                       1.11e-14  5_[1(2.70e-09)]_130_[2(1.98e-12)]_\
++    77
++FVT1_HUMAN                       5.86e-25  31_[1(2.86e-14)]_131_[2(3.54e-18)]_\
++    120
++HMTR_LEIMA                       1.11e-23  5_[1(6.98e-12)]_164_[2(3.97e-19)]_\
++    68
++MAS1_AGRRA                       5.88e-10  244_[1(3.13e-12)]_124_[2(3.64e-05)]_\
++    58
+ PCR_PEA                          1.93e-11  85_[1(1.55e-14)]_293
+-RFBB_NEIGO                       1.77e-19  5_[1(5.96e-12)]_136_[2(5.97e-15)]_155
++RFBB_NEIGO                       1.77e-19  5_[1(5.96e-12)]_136_[2(5.97e-15)]_\
++    155
+ YURA_MYXXA                       6.41e-14  157_[2(1.46e-17)]_72
+ --------------------------------------------------------------------------------
+ 
+@@ -608,6 +638,6 @@
+ Stopped because nmotifs = 2 reached.
+ ********************************************************************************
+ 
+-CPU: tlb-sayonara.imb.uq.edu.au
++CPU: tlb-squirrel
+ 
+ ********************************************************************************
+diff -r 5836e70b6834 -r 81f90e1597b4 tests/meme/meme.crp0.oops
+--- a/tests/meme/meme.crp0.oops	Wed Feb 22 12:48:03 2012 +1000
++++ b/tests/meme/meme.crp0.oops	Wed Feb 22 14:46:22 2012 +1000
+@@ -1,7 +1,7 @@
+ ********************************************************************************
+ MEME - Motif discovery tool
+ ********************************************************************************
+-MEME version 4.0.0 (Release date: 2008-07-12 05:23:09 +1000 (Sat, 12 Jul 2008))
++MEME version 4.8.1 (Release date: Wed Feb 22 11:51:06 EST 2012)
+ 
+ For further information on how to interpret these results or to get
+ a copy of the MEME software please access http://meme.nbcr.net.
+@@ -28,7 +28,7 @@
+ ********************************************************************************
+ TRAINING SET
+ ********************************************************************************
+-DATAFILE= /Users/t.bailey/meme_svn/positional-priors/scripts/../tests/common/crp0.s
++DATAFILE= /home/james/dist/scripts/../tests/common/crp0.s
+ ALPHABET= ACGT
+ Sequence name            Weight Length  Sequence name            Weight Length  
+ -------------            ------ ------  -------------            ------ ------  
+@@ -49,7 +49,7 @@
+ This information can also be useful in the event you wish to report a
+ problem with the MEME software.
+ 
+-command: meme /Users/t.bailey/meme_svn/positional-priors/scripts/../tests/common/crp0.s -text -mod oops -dna -revcomp -nostatus -nmotifs 2 -minw 8 
++command: meme /home/james/dist/scripts/../tests/common/crp0.s -text -mod oops -dna -revcomp -nostatus -nmotifs 2 -minw 8 
+ 
+ model:  mod=          oops    nmotifs=         2    evt=           inf
+ object function=  E-value of product of p-values
+@@ -226,7 +226,7 @@
+ 
+ 
+ 
+-Time  0.69 secs.
++Time  0.88 secs.
+ 
+ ********************************************************************************
+ 
+@@ -379,7 +379,7 @@
+ 
+ 
+ 
+-Time  1.22 secs.
++Time  1.45 secs.
+ 
+ ********************************************************************************
+ 
+@@ -394,17 +394,23 @@
+ SEQUENCE NAME            COMBINED P-VALUE  MOTIF DIAGRAM
+ -------------            ----------------  -------------
+ ce1cg                            5.40e-03  64_[+1(1.07e-05)]_26
+-ara                              1.90e-06  8_[+2(1.13e-06)]_38_[-1(2.85e-06)]_2_[-2(5.49e-05)]_20
++ara                              1.90e-06  8_[+2(1.13e-06)]_38_[-1(2.85e-06)]_\
++    2_[-2(5.49e-05)]_20
+ bglr1                            1.10e-03  78_[-1(9.67e-06)]_12
+ crp                              1.77e-03  65_[-1(1.29e-05)]_25
+ cya                              1.08e-03  52_[-1(4.88e-06)]_38
+-deop2                            2.60e-04  9_[-1(9.67e-06)]_36_[-2(6.67e-05)]_34
+-gale                             7.41e-05  1_[+2(2.81e-06)]_42_[+1(5.85e-05)]_2_[-2(6.67e-05)]_23
++deop2                            2.60e-04  9_[-1(9.67e-06)]_36_[-2(6.67e-05)]_\
++    34
++gale                             7.41e-05  1_[+2(2.81e-06)]_42_[+1(5.85e-05)]_\
++    2_[-2(6.67e-05)]_23
+ ilv                              4.88e-04  15_[-2(8.17e-06)]_79
+-lac                              1.31e-05  11_[-1(1.61e-06)]_63_[+2(1.58e-05)]_5
+-male                             5.21e-04  16_[-1(1.54e-05)]_48_[+2(9.04e-05)]_15
++lac                              1.31e-05  11_[-1(1.61e-06)]_63_[+2(1.58e-05)]_\
++    5
++male                             5.21e-04  16_[-1(1.54e-05)]_48_[+2(9.04e-05)]_\
++    15
+ malk                             4.44e-04  64_[+1(5.41e-06)]_26
+-malt                             4.02e-05  44_[+1(1.17e-05)]_6_[+2(7.27e-06)]_29
++malt                             4.02e-05  44_[+1(1.17e-05)]_6_[+2(7.27e-06)]_\
++    29
+ ompa                             1.77e-04  51_[+1(2.30e-06)]_39
+ tnaa                             7.39e-04  74_[+1(3.95e-06)]_16
+ uxu1                             6.93e-03  20_[+1(1.54e-05)]_70
+@@ -420,6 +426,6 @@
+ Stopped because nmotifs = 2 reached.
+ ********************************************************************************
+ 
+-CPU: tlb-kamikaze-lt-2.local
++CPU: tlb-squirrel
+ 
+ ********************************************************************************
+diff -r 5836e70b6834 -r 81f90e1597b4 tests/meme/meme.crp0.tcm
+--- a/tests/meme/meme.crp0.tcm	Wed Feb 22 12:48:03 2012 +1000
++++ b/tests/meme/meme.crp0.tcm	Wed Feb 22 14:46:22 2012 +1000
+@@ -1,7 +1,7 @@
+ ********************************************************************************
+ MEME - Motif discovery tool
+ ********************************************************************************
+-MEME version 4.0.0 (Release date: 2008-07-12 05:23:09 +1000 (Sat, 12 Jul 2008))
++MEME version 4.8.1 (Release date: Wed Feb 22 11:51:06 EST 2012)
+ 
+ For further information on how to interpret these results or to get
+ a copy of the MEME software please access http://meme.nbcr.net.
+@@ -28,7 +28,7 @@
+ ********************************************************************************
+ TRAINING SET
+ ********************************************************************************
+-DATAFILE= /home/t.bailey/MEME/SVNROOT/trunk/scripts/../tests/common/crp0.s
++DATAFILE= /home/james/dist/scripts/../tests/common/crp0.s
+ ALPHABET= ACGT
+ Sequence name            Weight Length  Sequence name            Weight Length  
+ -------------            ------ ------  -------------            ------ ------  
+@@ -49,7 +49,7 @@
+ This information can also be useful in the event you wish to report a
+ problem with the MEME software.
+ 
+-command: meme /home/t.bailey/MEME/SVNROOT/trunk/scripts/../tests/common/crp0.s -text -mod tcm -dna -revcomp -nostatus -nmotifs 2 -minw 8 
++command: meme /home/james/dist/scripts/../tests/common/crp0.s -text -mod tcm -dna -revcomp -nostatus -nmotifs 2 -minw 8 
+ 
+ model:  mod=           tcm    nmotifs=         2    evt=           inf
+ object function=  E-value of product of p-values
+@@ -240,7 +240,7 @@
+ 
+ 
+ 
+-Time  4.56 secs.
++Time  3.32 secs.
+ 
+ ********************************************************************************
+ 
+@@ -339,7 +339,7 @@
+ 
+ 
+ 
+-Time  7.45 secs.
++Time  5.44 secs.
+ 
+ ********************************************************************************
+ 
+@@ -353,16 +353,21 @@
+ --------------------------------------------------------------------------------
+ SEQUENCE NAME            COMBINED P-VALUE  MOTIF DIAGRAM
+ -------------            ----------------  -------------
+-ce1cg                            1.11e-03  16_[-1(3.97e-06)]_28_[+1(1.12e-06)]_23
++ce1cg                            1.11e-03  16_[-1(3.97e-06)]_28_[+1(1.12e-06)]_\
++    23
+ ara                              5.71e-05  57_[+1(2.90e-08)]_29
+ bglr1                            8.42e-03  78_[+1(6.37e-06)]_8
+ crp                              1.95e-03  65_[+1(1.40e-06)]_21
+ cya                              7.48e-03  49_[-1(6.37e-06)]_37
+-deop2                            1.00e-03  9_[+1(1.94e-06)]_31_[-1(9.94e-07)]_27
++deop2                            1.00e-03  9_[+1(1.94e-06)]_31_[-1(9.94e-07)]_\
++    27
+ gale                             2.27e-03  44_[+1(1.40e-06)]_42
+-ilv                              7.36e-06  4_[+2(2.18e-06)]_29_[+1(6.37e-06)]_45
+-lac                              1.91e-02  11_[+1(3.03e-05)]_42_[-1(2.82e-05)]_14
+-male                             9.43e-06  16_[+1(3.26e-06)]_5_[+2(5.56e-06)]_57
++ilv                              7.36e-06  4_[+2(2.18e-06)]_29_[+1(6.37e-06)]_\
++    45
++lac                              1.91e-02  11_[+1(3.03e-05)]_42_[-1(2.82e-05)]_\
++    14
++male                             9.43e-06  16_[+1(3.26e-06)]_5_[+2(5.56e-06)]_\
++    57
+ malk                             4.70e-03  60_[-1(1.64e-05)]_26
+ malt                             1.60e-03  40_[-1(1.12e-06)]_46
+ ompa                             1.60e-03  50_[+1(1.12e-06)]_36
+@@ -380,6 +385,6 @@
+ Stopped because nmotifs = 2 reached.
+ ********************************************************************************
+ 
+-CPU: tlb-sayonara.imb.uq.edu.au
++CPU: tlb-squirrel
+ 
+ ********************************************************************************
+diff -r 5836e70b6834 -r 81f90e1597b4 tests/meme/meme.crp0.zoops
+--- a/tests/meme/meme.crp0.zoops	Wed Feb 22 12:48:03 2012 +1000
++++ b/tests/meme/meme.crp0.zoops	Wed Feb 22 14:46:22 2012 +1000
+@@ -1,7 +1,7 @@
+ ********************************************************************************
+ MEME - Motif discovery tool
+ ********************************************************************************
+-MEME version 4.0.0 (Release date: 2008-07-12 05:23:09 +1000 (Sat, 12 Jul 2008))
++MEME version 4.8.1 (Release date: Wed Feb 22 11:51:06 EST 2012)
+ 
+ For further information on how to interpret these results or to get
+ a copy of the MEME software please access http://meme.nbcr.net.
+@@ -28,7 +28,7 @@
+ ********************************************************************************
+ TRAINING SET
+ ********************************************************************************
+-DATAFILE= /home/t.bailey/MEME/SVNROOT/trunk/scripts/../tests/common/crp0.s
++DATAFILE= /home/james/dist/scripts/../tests/common/crp0.s
+ ALPHABET= ACGT
+ Sequence name            Weight Length  Sequence name            Weight Length  
+ -------------            ------ ------  -------------            ------ ------  
+@@ -49,7 +49,7 @@
+ This information can also be useful in the event you wish to report a
+ problem with the MEME software.
+ 
+-command: meme /home/t.bailey/MEME/SVNROOT/trunk/scripts/../tests/common/crp0.s -text -mod zoops -dna -revcomp -nostatus -nmotifs 2 -minw 8 
++command: meme /home/james/dist/scripts/../tests/common/crp0.s -text -mod zoops -dna -revcomp -nostatus -nmotifs 2 -minw 8 
+ 
+ model:  mod=         zoops    nmotifs=         2    evt=           inf
+ object function=  E-value of product of p-values
+@@ -232,7 +232,7 @@
+ 
+ 
+ 
+-Time  3.66 secs.
++Time  2.57 secs.
+ 
+ ********************************************************************************
+ 
+@@ -331,7 +331,7 @@
+ 
+ 
+ 
+-Time  6.04 secs.
++Time  4.11 secs.
+ 
+ ********************************************************************************
+ 
+@@ -352,9 +352,11 @@
+ cya                              1.86e-02  49_[+1(1.81e-05)]_38
+ deop2                            2.60e-03  59_[+1(2.85e-06)]_28
+ gale                             1.73e-02  45_[-1(1.41e-05)]_42
+-ilv                              2.14e-06  4_[+2(2.18e-06)]_30_[-1(1.69e-06)]_45
++ilv                              2.14e-06  4_[+2(2.18e-06)]_30_[-1(1.69e-06)]_\
++    45
+ lac                              5.79e-04  8_[+1(5.35e-07)]_79
+-male                             3.43e-05  13_[+1(1.29e-05)]_9_[+2(5.56e-06)]_57
++male                             3.43e-05  13_[+1(1.29e-05)]_9_[+2(5.56e-06)]_\
++    57
+ malk                             4.82e-03  60_[+1(1.67e-05)]_27
+ malt                             1.28e-03  40_[+1(8.61e-07)]_47
+ ompa                             1.02e-02  47_[+1(9.04e-06)]_40
+@@ -372,6 +374,6 @@
+ Stopped because nmotifs = 2 reached.
+ ********************************************************************************
+ 
+-CPU: tlb-sayonara.imb.uq.edu.au
++CPU: tlb-squirrel
+ 
+ ********************************************************************************
+diff -r 5836e70b6834 -r 81f90e1597b4 tests/meme/meme.farntrans5.oops
+--- a/tests/meme/meme.farntrans5.oops	Wed Feb 22 12:48:03 2012 +1000
++++ b/tests/meme/meme.farntrans5.oops	Wed Feb 22 14:46:22 2012 +1000
+@@ -1,7 +1,7 @@
+ ********************************************************************************
+ MEME - Motif discovery tool
+ ********************************************************************************
+-MEME version 4.0.0 (Release date: 2008-07-12 05:23:09 +1000 (Sat, 12 Jul 2008))
++MEME version 4.8.1 (Release date: Wed Feb 22 11:51:06 EST 2012)
+ 
+ For further information on how to interpret these results or to get
+ a copy of the MEME software please access http://meme.nbcr.net.
+@@ -28,7 +28,7 @@
+ ********************************************************************************
+ TRAINING SET
+ ********************************************************************************
+-DATAFILE= /home/t.bailey/MEME/SVNROOT/trunk/scripts/../tests/common/farntrans5.s
++DATAFILE= /home/james/dist/scripts/../tests/common/farntrans5.s
+ ALPHABET= ACDEFGHIKLMNPQRSTVWY
+ Sequence name            Weight Length  Sequence name            Weight Length  
+ -------------            ------ ------  -------------            ------ ------  
+@@ -43,7 +43,7 @@
+ This information can also be useful in the event you wish to report a
+ problem with the MEME software.
+ 
+-command: meme /home/t.bailey/MEME/SVNROOT/trunk/scripts/../tests/common/farntrans5.s -text -mod oops -protein -nostatus -nmotifs 2 -minw 8 
++command: meme /home/james/dist/scripts/../tests/common/farntrans5.s -text -mod oops -protein -nostatus -nmotifs 2 -minw 8 
+ 
+ model:  mod=          oops    nmotifs=         2    evt=           inf
+ object function=  E-value of product of p-values
+@@ -237,7 +237,7 @@
+ 
+ 
+ 
+-Time  1.24 secs.
++Time  0.89 secs.
+ 
+ ********************************************************************************
+ 
+@@ -390,7 +390,7 @@
+ 
+ 
+ 
+-Time  2.20 secs.
++Time  1.61 secs.
+ 
+ ********************************************************************************
+ 
+@@ -404,11 +404,16 @@
+ --------------------------------------------------------------------------------
+ SEQUENCE NAME            COMBINED P-VALUE  MOTIF DIAGRAM
+ -------------            ----------------  -------------
+-RAM1_YEAST                       2.49e-40  291_[1(4.70e-27)]_19_[2(3.34e-21)]_67
+-PFTB_RAT                         1.93e-40  133_[1(5.68e-09)]_19_[1(4.88e-05)]_16_[1(4.55e-09)]_17_[1(3.49e-29)]_28_[2(3.38e-19)]_74
+-BET2_YEAST                       7.54e-48  66_[2(1.77e-05)]_31_[1(4.36e-09)]_16_[1(7.32e-08)]_19_[1(6.27e-34)]_15_[2(1.18e-21)]_38
+-RATRABGERB                       1.07e-48  126_[1(2.13e-09)]_16_[1(4.63e-06)]_16_[1(1.37e-32)]_15_[2(7.25e-24)]_40
+-CAL1_YEAST                       2.44e-33  270_[1(5.14e-27)]_18_[2(4.81e-14)]_34
++RAM1_YEAST                       2.49e-40  291_[1(4.70e-27)]_19_[2(3.34e-21)]_\
++    67
++PFTB_RAT                         1.93e-40  133_[1(5.68e-09)]_19_[1(4.88e-05)]_\
++    16_[1(4.55e-09)]_17_[1(3.49e-29)]_28_[2(3.38e-19)]_74
++BET2_YEAST                       7.54e-48  66_[2(1.77e-05)]_31_[1(4.36e-09)]_\
++    16_[1(7.32e-08)]_19_[1(6.27e-34)]_15_[2(1.18e-21)]_38
++RATRABGERB                       1.07e-48  126_[1(2.13e-09)]_16_[1(4.63e-06)]_\
++    16_[1(1.37e-32)]_15_[2(7.25e-24)]_40
++CAL1_YEAST                       2.44e-33  270_[1(5.14e-27)]_18_[2(4.81e-14)]_\
++    34
+ --------------------------------------------------------------------------------
+ 
+ ********************************************************************************
+@@ -418,6 +423,6 @@
+ Stopped because nmotifs = 2 reached.
+ ********************************************************************************
+ 
+-CPU: tlb-sayonara.imb.uq.edu.au
++CPU: tlb-squirrel
+ 
+ ********************************************************************************
+diff -r 5836e70b6834 -r 81f90e1597b4 tests/meme/meme.farntrans5.tcm
+--- a/tests/meme/meme.farntrans5.tcm	Wed Feb 22 12:48:03 2012 +1000
++++ b/tests/meme/meme.farntrans5.tcm	Wed Feb 22 14:46:22 2012 +1000
+@@ -1,7 +1,7 @@
+ ********************************************************************************
+ MEME - Motif discovery tool
+ ********************************************************************************
+-MEME version 4.0.0 (Release date: 2008-07-12 05:23:09 +1000 (Sat, 12 Jul 2008))
++MEME version 4.8.1 (Release date: Wed Feb 22 11:51:06 EST 2012)
+ 
+ For further information on how to interpret these results or to get
+ a copy of the MEME software please access http://meme.nbcr.net.
+@@ -28,7 +28,7 @@
+ ********************************************************************************
+ TRAINING SET
+ ********************************************************************************
+-DATAFILE= /home/t.bailey/MEME/SVNROOT/trunk/scripts/../tests/common/farntrans5.s
++DATAFILE= /home/james/dist/scripts/../tests/common/farntrans5.s
+ ALPHABET= ACDEFGHIKLMNPQRSTVWY
+ Sequence name            Weight Length  Sequence name            Weight Length  
+ -------------            ------ ------  -------------            ------ ------  
+@@ -43,7 +43,7 @@
+ This information can also be useful in the event you wish to report a
+ problem with the MEME software.
+ 
+-command: meme /home/t.bailey/MEME/SVNROOT/trunk/scripts/../tests/common/farntrans5.s -text -mod tcm -protein -nostatus -nmotifs 2 -minw 8 
++command: meme /home/james/dist/scripts/../tests/common/farntrans5.s -text -mod tcm -protein -nostatus -nmotifs 2 -minw 8 
+ 
+ model:  mod=           tcm    nmotifs=         2    evt=           inf
+ object function=  E-value of product of p-values
+@@ -274,7 +274,7 @@
+ 
+ 
+ 
+-Time  9.37 secs.
++Time  7.64 secs.
+ 
+ ********************************************************************************
+ 
+@@ -443,7 +443,7 @@
+ 
+ 
+ 
+-Time 13.92 secs.
++Time 11.39 secs.
+ 
+ ********************************************************************************
+ 
+@@ -457,11 +457,20 @@
+ --------------------------------------------------------------------------------
+ SEQUENCE NAME            COMBINED P-VALUE  MOTIF DIAGRAM
+ -------------            ----------------  -------------
+-RAM1_YEAST                       1.09e-19  144_[1(8.68e-17)]_5_[2(1.44e-07)]_4_[1(1.67e-13)]_1_[2(2.07e-08)]_4_[1(4.93e-17)]_1_[2(2.70e-10)]_4_[1(2.87e-16)]_4_[2(4.96e-08)]_5_[1(5.11e-13)]_35_[2(6.96e-09)]_4
+-PFTB_RAT                         5.87e-22  72_[2(1.55e-07)]_51_[1(2.44e-19)]_4_[2(4.03e-10)]_3_[1(3.29e-14)]_1_[2(1.26e-08)]_3_[1(1.56e-19)]_1_[2(6.39e-09)]_4_[1(2.62e-16)]_32_[1(7.66e-15)]_60
+-BET2_YEAST                       2.36e-26  6_[2(3.17e-09)]_3_[1(2.82e-10)]_1_[2(1.37e-08)]_4_[1(7.21e-14)]_4_[2(1.93e-07)]_3_[1(2.77e-17)]_18_[1(2.53e-18)]_21_[1(6.98e-22)]_1_[2(5.70e-12)]_4_[1(7.19e-17)]_24
+-RATRABGERB                       7.64e-26  17_[2(1.15e-07)]_34_[2(2.71e-12)]_3_[1(2.21e-14)]_1_[2(1.27e-09)]_3_[1(8.90e-19)]_1_[2(2.61e-11)]_3_[1(6.47e-19)]_18_[1(4.67e-21)]_1_[2(6.43e-12)]_4_[1(1.27e-17)]_26
+-CAL1_YEAST                       5.59e-23  35_[2(5.20e-07)]_76_[2(1.06e-08)]_50_[2(6.30e-11)]_1_[1(1.14e-13)]_40_[1(1.25e-19)]_22_[1(4.42e-13)]_20
++RAM1_YEAST                       1.09e-19  144_[1(8.68e-17)]_5_[2(1.44e-07)]_4_\
++    [1(1.67e-13)]_1_[2(2.07e-08)]_4_[1(4.93e-17)]_1_[2(2.70e-10)]_4_\
++    [1(2.87e-16)]_4_[2(4.96e-08)]_5_[1(5.11e-13)]_35_[2(6.96e-09)]_4
++PFTB_RAT                         5.87e-22  72_[2(1.55e-07)]_51_[1(2.44e-19)]_4_\
++    [2(4.03e-10)]_3_[1(3.29e-14)]_1_[2(1.26e-08)]_3_[1(1.56e-19)]_1_\
++    [2(6.39e-09)]_4_[1(2.62e-16)]_32_[1(7.66e-15)]_60
++BET2_YEAST                       2.36e-26  6_[2(3.17e-09)]_3_[1(2.82e-10)]_1_\
++    [2(1.37e-08)]_4_[1(7.21e-14)]_4_[2(1.93e-07)]_3_[1(2.77e-17)]_18_\
++    [1(2.53e-18)]_21_[1(6.98e-22)]_1_[2(5.70e-12)]_4_[1(7.19e-17)]_24
++RATRABGERB                       7.64e-26  17_[2(1.15e-07)]_34_[2(2.71e-12)]_3_\
++    [1(2.21e-14)]_1_[2(1.27e-09)]_3_[1(8.90e-19)]_1_[2(2.61e-11)]_3_\
++    [1(6.47e-19)]_18_[1(4.67e-21)]_1_[2(6.43e-12)]_4_[1(1.27e-17)]_26
++CAL1_YEAST                       5.59e-23  35_[2(5.20e-07)]_76_[2(1.06e-08)]_\
++    50_[2(6.30e-11)]_1_[1(1.14e-13)]_40_[1(1.25e-19)]_22_[1(4.42e-13)]_20
+ --------------------------------------------------------------------------------
+ 
+ ********************************************************************************
+@@ -471,6 +480,6 @@
+ Stopped because nmotifs = 2 reached.
+ ********************************************************************************
+ 
+-CPU: tlb-sayonara.imb.uq.edu.au
++CPU: tlb-squirrel
+ 
+ ********************************************************************************
+diff -r 5836e70b6834 -r 81f90e1597b4 tests/meme/meme.farntrans5.zoops
+--- a/tests/meme/meme.farntrans5.zoops	Wed Feb 22 12:48:03 2012 +1000
++++ b/tests/meme/meme.farntrans5.zoops	Wed Feb 22 14:46:22 2012 +1000
+@@ -1,7 +1,7 @@
+ ********************************************************************************
+ MEME - Motif discovery tool
+ ********************************************************************************
+-MEME version 4.0.0 (Release date: 2008-07-12 05:23:09 +1000 (Sat, 12 Jul 2008))
++MEME version 4.8.1 (Release date: Wed Feb 22 11:51:06 EST 2012)
+ 
+ For further information on how to interpret these results or to get
+ a copy of the MEME software please access http://meme.nbcr.net.
+@@ -28,7 +28,7 @@
+ ********************************************************************************
+ TRAINING SET
+ ********************************************************************************
+-DATAFILE= /home/t.bailey/MEME/SVNROOT/trunk/scripts/../tests/common/farntrans5.s
++DATAFILE= /home/james/dist/scripts/../tests/common/farntrans5.s
+ ALPHABET= ACDEFGHIKLMNPQRSTVWY
+ Sequence name            Weight Length  Sequence name            Weight Length  
+ -------------            ------ ------  -------------            ------ ------  
+@@ -43,7 +43,7 @@
+ This information can also be useful in the event you wish to report a
+ problem with the MEME software.
+ 
+-command: meme /home/t.bailey/MEME/SVNROOT/trunk/scripts/../tests/common/farntrans5.s -text -mod zoops -protein -nostatus -nmotifs 2 -minw 8 
++command: meme /home/james/dist/scripts/../tests/common/farntrans5.s -text -mod zoops -protein -nostatus -nmotifs 2 -minw 8 
+ 
+ model:  mod=         zoops    nmotifs=         2    evt=           inf
+ object function=  E-value of product of p-values
+@@ -237,7 +237,7 @@
+ 
+ 
+ 
+-Time  2.91 secs.
++Time  2.19 secs.
+ 
+ ********************************************************************************
+ 
+@@ -443,7 +443,7 @@
+ 
+ 
+ 
+-Time  5.70 secs.
++Time  4.34 secs.
+ 
+ ********************************************************************************
+ 
+@@ -457,11 +457,16 @@
+ --------------------------------------------------------------------------------
+ SEQUENCE NAME            COMBINED P-VALUE  MOTIF DIAGRAM
+ -------------            ----------------  -------------
+-RAM1_YEAST                       8.29e-64  205_[2(7.64e-45)]_36_[1(4.70e-27)]_108
+-PFTB_RAT                         8.01e-65  133_[1(5.68e-09)]_31_[2(9.48e-44)]_35_[1(3.49e-29)]_30_[1(6.10e-07)]_62
+-BET2_YEAST                       1.87e-70  31_[2(1.42e-05)]_50_[2(2.21e-44)]_37_[1(6.27e-34)]_17_[1(9.32e-07)]_26
+-RATRABGERB                       1.33e-67  42_[2(3.11e-09)]_46_[2(7.21e-43)]_34_[1(1.37e-32)]_17_[1(2.11e-07)]_28
+-CAL1_YEAST                       1.63e-25  212_[2(4.52e-06)]_8_[1(5.14e-27)]_20_[1(5.21e-05)]_22
++RAM1_YEAST                       8.29e-64  205_[2(7.64e-45)]_36_[1(4.70e-27)]_\
++    108
++PFTB_RAT                         8.01e-65  133_[1(5.68e-09)]_31_[2(9.48e-44)]_\
++    35_[1(3.49e-29)]_30_[1(6.10e-07)]_62
++BET2_YEAST                       1.87e-70  31_[2(1.42e-05)]_50_[2(2.21e-44)]_\
++    37_[1(6.27e-34)]_17_[1(9.32e-07)]_26
++RATRABGERB                       1.33e-67  42_[2(3.11e-09)]_46_[2(7.21e-43)]_\
++    34_[1(1.37e-32)]_17_[1(2.11e-07)]_28
++CAL1_YEAST                       1.63e-25  212_[2(4.52e-06)]_8_[1(5.14e-27)]_\
++    20_[1(5.21e-05)]_22
+ --------------------------------------------------------------------------------
+ 
+ ********************************************************************************
+@@ -471,6 +476,6 @@
+ Stopped because nmotifs = 2 reached.
+ ********************************************************************************
+ 
+-CPU: tlb-sayonara.imb.uq.edu.au
++CPU: tlb-squirrel
+ 
+ ********************************************************************************
+diff -r 5836e70b6834 -r 81f90e1597b4 tests/meme/meme.lipocalin.oops
+--- a/tests/meme/meme.lipocalin.oops	Wed Feb 22 12:48:03 2012 +1000
++++ b/tests/meme/meme.lipocalin.oops	Wed Feb 22 14:46:22 2012 +1000
+@@ -1,7 +1,7 @@
+ ********************************************************************************
+ MEME - Motif discovery tool
+ ********************************************************************************
+-MEME version 4.0.0 (Release date: 2008-07-12 05:23:09 +1000 (Sat, 12 Jul 2008))
++MEME version 4.8.1 (Release date: Wed Feb 22 11:51:06 EST 2012)
+ 
+ For further information on how to interpret these results or to get
+ a copy of the MEME software please access http://meme.nbcr.net.
+@@ -28,7 +28,7 @@
+ ********************************************************************************
+ TRAINING SET
+ ********************************************************************************
+-DATAFILE= /home/t.bailey/MEME/SVNROOT/trunk/scripts/../tests/common/lipocalin.s
++DATAFILE= /home/james/dist/scripts/../tests/common/lipocalin.s
+ ALPHABET= ACDEFGHIKLMNPQRSTVWY
+ Sequence name            Weight Length  Sequence name            Weight Length  
+ -------------            ------ ------  -------------            ------ ------  
+@@ -43,7 +43,7 @@
+ This information can also be useful in the event you wish to report a
+ problem with the MEME software.
+ 
+-command: meme /home/t.bailey/MEME/SVNROOT/trunk/scripts/../tests/common/lipocalin.s -text -mod oops -protein -nostatus -nmotifs 2 -minw 8 
++command: meme /home/james/dist/scripts/../tests/common/lipocalin.s -text -mod oops -protein -nostatus -nmotifs 2 -minw 8 
+ 
+ model:  mod=          oops    nmotifs=         2    evt=           inf
+ object function=  E-value of product of p-values
+@@ -211,7 +211,7 @@
+ 
+ 
+ 
+-Time  0.63 secs.
++Time  0.53 secs.
+ 
+ ********************************************************************************
+ 
+@@ -360,7 +360,7 @@
+ 
+ 
+ 
+-Time  1.13 secs.
++Time  0.92 secs.
+ 
+ ********************************************************************************
+ 
+@@ -374,11 +374,16 @@
+ --------------------------------------------------------------------------------
+ SEQUENCE NAME            COMBINED P-VALUE  MOTIF DIAGRAM
+ -------------            ----------------  -------------
+-ICYA_MANSE                       1.22e-30  13_[1(1.35e-18)]_67_[2(4.19e-19)]_70
+-LACB_BOVIN                       6.79e-21  21_[1(8.37e-15)]_64_[2(6.21e-13)]_54
+-BBP_PIEBR                        2.37e-29  12_[1(1.29e-17)]_64_[2(1.08e-18)]_58
+-RETB_BOVIN                       8.72e-26  10_[1(2.09e-16)]_71_[2(2.46e-16)]_63
+-MUP2_MOUSE                       3.21e-21  23_[1(4.32e-14)]_62_[2(5.47e-14)]_56
++ICYA_MANSE                       1.22e-30  13_[1(1.35e-18)]_67_[2(4.19e-19)]_\
++    70
++LACB_BOVIN                       6.79e-21  21_[1(8.37e-15)]_64_[2(6.21e-13)]_\
++    54
++BBP_PIEBR                        2.37e-29  12_[1(1.29e-17)]_64_[2(1.08e-18)]_\
++    58
++RETB_BOVIN                       8.72e-26  10_[1(2.09e-16)]_71_[2(2.46e-16)]_\
++    63
++MUP2_MOUSE                       3.21e-21  23_[1(4.32e-14)]_62_[2(5.47e-14)]_\
++    56
+ --------------------------------------------------------------------------------
+ 
+ ********************************************************************************
+@@ -388,6 +393,6 @@
+ Stopped because nmotifs = 2 reached.
+ ********************************************************************************
+ 
+-CPU: tlb-sayonara.imb.uq.edu.au
++CPU: tlb-squirrel
+ 
+ ********************************************************************************
+diff -r 5836e70b6834 -r 81f90e1597b4 tests/meme/meme.lipocalin.tcm
+--- a/tests/meme/meme.lipocalin.tcm	Wed Feb 22 12:48:03 2012 +1000
++++ b/tests/meme/meme.lipocalin.tcm	Wed Feb 22 14:46:22 2012 +1000
+@@ -1,7 +1,7 @@
+ ********************************************************************************
+ MEME - Motif discovery tool
+ ********************************************************************************
+-MEME version 4.0.0 (Release date: 2008-07-12 05:23:09 +1000 (Sat, 12 Jul 2008))
++MEME version 4.8.1 (Release date: Wed Feb 22 11:51:06 EST 2012)
+ 
+ For further information on how to interpret these results or to get
+ a copy of the MEME software please access http://meme.nbcr.net.
+@@ -28,7 +28,7 @@
+ ********************************************************************************
+ TRAINING SET
+ ********************************************************************************
+-DATAFILE= /home/t.bailey/MEME/SVNROOT/trunk/scripts/../tests/common/lipocalin.s
++DATAFILE= /home/james/dist/scripts/../tests/common/lipocalin.s
+ ALPHABET= ACDEFGHIKLMNPQRSTVWY
+ Sequence name            Weight Length  Sequence name            Weight Length  
+ -------------            ------ ------  -------------            ------ ------  
+@@ -43,7 +43,7 @@
+ This information can also be useful in the event you wish to report a
+ problem with the MEME software.
+ 
+-command: meme /home/t.bailey/MEME/SVNROOT/trunk/scripts/../tests/common/lipocalin.s -text -mod tcm -protein -nostatus -nmotifs 2 -minw 8 
++command: meme /home/james/dist/scripts/../tests/common/lipocalin.s -text -mod tcm -protein -nostatus -nmotifs 2 -minw 8 
+ 
+ model:  mod=           tcm    nmotifs=         2    evt=           inf
+ object function=  E-value of product of p-values
+@@ -223,7 +223,7 @@
+ 
+ 
+ 
+-Time  3.34 secs.
++Time  2.72 secs.
+ 
+ ********************************************************************************
+ 
+@@ -407,7 +407,7 @@
+ 
+ 
+ 
+-Time  6.43 secs.
++Time  5.23 secs.
+ 
+ ********************************************************************************
+ 
+@@ -435,6 +435,6 @@
+ Stopped because nmotifs = 2 reached.
+ ********************************************************************************
+ 
+-CPU: tlb-sayonara.imb.uq.edu.au
++CPU: tlb-squirrel
+ 
+ ********************************************************************************
+diff -r 5836e70b6834 -r 81f90e1597b4 tests/meme/meme.lipocalin.zoops
+--- a/tests/meme/meme.lipocalin.zoops	Wed Feb 22 12:48:03 2012 +1000
++++ b/tests/meme/meme.lipocalin.zoops	Wed Feb 22 14:46:22 2012 +1000
+@@ -1,7 +1,7 @@
+ ********************************************************************************
+ MEME - Motif discovery tool
+ ********************************************************************************
+-MEME version 4.0.0 (Release date: 2008-07-12 05:23:09 +1000 (Sat, 12 Jul 2008))
++MEME version 4.8.1 (Release date: Wed Feb 22 11:51:06 EST 2012)
+ 
+ For further information on how to interpret these results or to get
+ a copy of the MEME software please access http://meme.nbcr.net.
+@@ -28,7 +28,7 @@
+ ********************************************************************************
+ TRAINING SET
+ ********************************************************************************
+-DATAFILE= /home/t.bailey/MEME/SVNROOT/trunk/scripts/../tests/common/lipocalin.s
++DATAFILE= /home/james/dist/scripts/../tests/common/lipocalin.s
+ ALPHABET= ACDEFGHIKLMNPQRSTVWY
+ Sequence name            Weight Length  Sequence name            Weight Length  
+ -------------            ------ ------  -------------            ------ ------  
+@@ -43,7 +43,7 @@
+ This information can also be useful in the event you wish to report a
+ problem with the MEME software.
+ 
+-command: meme /home/t.bailey/MEME/SVNROOT/trunk/scripts/../tests/common/lipocalin.s -text -mod zoops -protein -nostatus -nmotifs 2 -minw 8 
++command: meme /home/james/dist/scripts/../tests/common/lipocalin.s -text -mod zoops -protein -nostatus -nmotifs 2 -minw 8 
+ 
+ model:  mod=         zoops    nmotifs=         2    evt=           inf
+ object function=  E-value of product of p-values
+@@ -225,7 +225,7 @@
+ 
+ 
+ 
+-Time  1.84 secs.
++Time  1.49 secs.
+ 
+ ********************************************************************************
+ 
+@@ -374,7 +374,7 @@
+ 
+ 
+ 
+-Time  3.27 secs.
++Time  2.64 secs.
+ 
+ ********************************************************************************
+ 
+@@ -389,10 +389,12 @@
+ SEQUENCE NAME            COMBINED P-VALUE  MOTIF DIAGRAM
+ -------------            ----------------  -------------
+ ICYA_MANSE                       2.35e-36  6_[1(2.29e-24)]_67_[2(4.19e-19)]_70
+-LACB_BOVIN                       2.62e-24  14_[1(2.92e-18)]_64_[2(6.21e-13)]_54
++LACB_BOVIN                       2.62e-24  14_[1(2.92e-18)]_64_[2(6.21e-13)]_\
++    54
+ BBP_PIEBR                        3.76e-36  5_[1(1.76e-24)]_64_[2(1.08e-18)]_58
+ RETB_BOVIN                       8.78e-29  3_[1(1.97e-19)]_71_[2(2.46e-16)]_63
+-MUP2_MOUSE                       5.29e-24  16_[1(6.60e-17)]_62_[2(5.47e-14)]_56
++MUP2_MOUSE                       5.29e-24  16_[1(6.60e-17)]_62_[2(5.47e-14)]_\
++    56
+ --------------------------------------------------------------------------------
+ 
+ ********************************************************************************
+@@ -402,6 +404,6 @@
+ Stopped because nmotifs = 2 reached.
+ ********************************************************************************
+ 
+-CPU: tlb-sayonara.imb.uq.edu.au
++CPU: tlb-squirrel
+ 
+ ********************************************************************************
+# HG changeset patch
+# User James Johnson <j.johnson@imb.uq.edu.au>
+# Date 1330415874 -36000
+# Node ID bd2d22b864256dc0b42b6a56bef63becb270d989
+# Parent  81f90e1597b487144ea82df256c8b1eccd8a3923
+Fixed bug in MAST originally introduced in revision 2337 (aka fc487af14785 ).
+
+That revision added the ambiguity characters J and O to hash_alph.h however the
+background frequency tables were not updated leading to wrong values being looked up.
+As this bug only effected protein motif searches and the tests in runcheck only
+test DNA motif searches this bug was not noticed for a long time...
+
+To fix this bug I added in the missing frequency entries in hash_alph.h.
+
+Also the additiona of the 2 new columns to the internal format in MAST lead to
+it calculating slightly different pearson correleation coefficients. I have
+changed the correlation calculation to only use the real (not ambiguous) columns.
+
+As I modified the pearson correleation coefficient calculation I had to update
+the tests to match. I also updated a MEME test which I had forgotten previously.
+
+Note that mast.INO_up800.zoops changed more dramatically as input motifs changed
+since the test had been last generated.
+
+diff -r 81f90e1597b4 -r bd2d22b86425 src/hash_alph.h
+--- a/src/hash_alph.h	Wed Feb 22 14:46:22 2012 +1000
++++ b/src/hash_alph.h	Tue Feb 28 17:57:54 2012 +1000
+@@ -152,10 +152,12 @@
+     0.069259642 /* G */,
+     0.022405456 /* H */,
+     0.056227000 /* I */,
++    0.0         /* J; added manually */,
+     0.058435042 /* K */,
+     0.091621836 /* L */,
+     0.023044274 /* M */,
+     0.046032137 /* N */,
++    0.0         /* O; added manually */,
+     0.050623807 /* P */,
+     0.040715284 /* Q */,
+     0.051846246 /* R */,
+@@ -185,10 +187,12 @@
+    0.07363406 /* G */,
+    0.02911862 /* H */,
+    0.04092760 /* I */,
++   0.0        /* J; added manually */,
+    0.05187635 /* K */,
+    0.09566732 /* L */,
+    0.01747826 /* M */,
+    0.03216447 /* N */,
++   0.0        /* O; added manually */,
+    0.06506016 /* P */,
+    0.04180057 /* Q */,
+    0.06748940 /* R */,
+@@ -214,10 +218,12 @@
+    0.05 /* G */,
+    0.05 /* H */,
+    0.05 /* I */,
++   0.0  /* J (ambiguity character for I or L) */,
+    0.05 /* K */,
+    0.05 /* L */,
+    0.05 /* M */,
+    0.05 /* N */,
++   0.0  /* O (ambiguity character for anything) */,
+    0.05 /* P */,
+    0.05 /* Q */,
+    0.05 /* R */,
+diff -r 81f90e1597b4 -r bd2d22b86425 src/logodds.c
+--- a/src/logodds.c	Wed Feb 22 14:46:22 2012 +1000
++++ b/src/logodds.c	Tue Feb 28 17:57:54 2012 +1000
+@@ -432,17 +432,22 @@
+   LO *los[]			/* array of logodds structures */
+ )
+ {
+-  int i, j, k, l, m, n, o;
++  int i, j, k, l, m, n, o, alen;
+   double *means[MAXLO];			/* means of motif columns */
++  char *alphabet;
++  /* only use non-ambiguous chars in correlation */
++  alphabet = (nmotifs > 0 && los[0]->dna ? DNA0 : PROTEIN0);
++  alen = strlen(alphabet);
+ 
+   /* compute the motif column means */
+   for (i=0; i<nmotifs; i++) {
+     int w = los[i]->w;			/* width of motif i */
+-    int alen = los[i]->alen;		/* alphabet length */
+     means[i] = NULL; Resize(means[i], w, double);
+     for (j=0; j<w; j++) {		/* motif column */
+       means[i][j] = 0;
+-      for (k=0; k<alen; k++) means[i][j] += los[i]->logodds(j,k);
++      for (k=0; k<alen; k++) {
++        means[i][j] += los[i]->logodds(j, hash(alphabet[k]));
++      }
+       means[i][j] /= alen;
+     }
+   }
+@@ -451,7 +456,6 @@
+      motif pairs
+   */
+   for (i=0; i<nmotifs; i++) {			/* "from" motif */
+-    int alen = los[i]->alen;		 	/* alphabet length */
+     los[i]->corr = NULL;
+     Resize(los[i]->corr, nmotifs, double);	/* create correlation array */
+     for (j=0; j<i; j++) {			/* "to" motif */
+@@ -481,8 +485,9 @@
+ 	    double sum1=0, sum2=0, sum3=0;
+ 	    double r, denom;
+ 	    for (n=0; n<alen; n++) { 		/* letter */
+-	      double a = lo1->logodds(l,n) - mu1[l];
+-	      double b = lo2->logodds(m,n) - mu2[m];
++	      int pos = hash(alphabet[n]);
++	      double a = lo1->logodds(l,pos) - mu1[l];
++	      double b = lo2->logodds(m,pos) - mu2[m];
+ 	      sum1 += a * b;
+ 	      sum2 += a * a;
+ 	      sum3 += b * b;
+diff -r 81f90e1597b4 -r bd2d22b86425 tests/mast/mast.INO_up800.oops
+--- a/tests/mast/mast.INO_up800.oops	Wed Feb 22 14:46:22 2012 +1000
++++ b/tests/mast/mast.INO_up800.oops	Tue Feb 28 17:57:54 2012 +1000
+@@ -62,9 +62,9 @@
+ <!ELEMENT runtime EMPTY>
+ <!ATTLIST runtime cycles CDATA #REQUIRED seconds CDATA #REQUIRED>
+ ]>
+-<mast version="4.3.2" release="Fri Apr 09 12:00:00 EST 2009">
++<mast version="4.8.1" release="Tue Feb 28 17:11:35 EST 2012">
+ 	<model>
+-		<command_line>mast /home/james/memesvn/gomo2/scripts/../tests/meme/meme.INO_up800.oops /home/james/memesvn/gomo2/scripts/../tests/common/INO_up800.s -oc /home/james/memesvn/gomo2/scripts/../tests/results/mast -nohtml -nostatus</command_line>
++		<command_line>mast /home/james/meme/scripts/../tests/meme/meme.INO_up800.oops /home/james/meme/scripts/../tests/common/INO_up800.s -oc /home/james/meme/scripts/../tests/results/mast -nohtml -nostatus</command_line>
+ 		<max_correlation>0.60</max_correlation>
+ 		<remove_correlated value="n"/>
+ 		<strand_handling value="combine"/>
+@@ -74,7 +74,7 @@
+ 		<max_hit_pvalue>0.0001</max_hit_pvalue>
+ 		<max_weak_pvalue>0.0001</max_weak_pvalue>
+ 		<host>tlb-squirrel</host>
+-		<when>Fri Apr  9 17:08:52 2010</when>
++		<when>Tue Feb 28 17:27:34 2012</when>
+ 	</model>
+ 	<alphabet type="nucleotide" bg_source="preset">
+ 		<letter symbol="A" bg_value="0.274"/>
+@@ -82,13 +82,13 @@
+ 		<letter symbol="G" bg_value="0.225"/>
+ 		<letter symbol="T" bg_value="0.274"/>
+ 	</alphabet>
+-	<motifs source="/home/james/memesvn/gomo2/scripts/../tests/meme/meme.INO_up800.oops" name="/home/james/memesvn/gomo2/scripts/../tests/meme/meme.INO_up800.oops" last_mod_date="Mon Feb 15 12:10:16 2010">
++	<motifs source="/home/james/meme/scripts/../tests/meme/meme.INO_up800.oops" name="/home/james/meme/scripts/../tests/meme/meme.INO_up800.oops" last_mod_date="Tue Feb 28 17:06:39 2012">
+ 		<motif id="motif_1" num="1" name="1" width="17" best_f="GGCGGCATGTGAAAAGT" best_r="ACTTTTCACATGCCGCC"/>
+ 		<motif id="motif_2" num="2" name="2" width="10" best_f="TCTGGCACAG" best_r="CTGTGCCAGA"/>
+-		<correlation motif_a="motif_1" motif_b="motif_2" value="0.25"/>
++		<correlation motif_a="motif_1" motif_b="motif_2" value="0.26"/>
+ 	</motifs>
+ 	<sequences>
+-		<database id="db_1" num="1" source="/home/james/memesvn/gomo2/scripts/../tests/common/INO_up800.s" name="/home/james/memesvn/gomo2/scripts/../tests/common/INO_up800.s" last_mod_date="Mon Feb 15 12:10:17 2010" seq_count="7" residue_count="5600" type="nucleotide"/>
++		<database id="db_1" num="1" source="/home/james/meme/scripts/../tests/common/INO_up800.s" name="/home/james/meme/scripts/../tests/common/INO_up800.s" last_mod_date="Wed Nov  9 18:52:42 2011" seq_count="7" residue_count="5600" type="nucleotide"/>
+ 		<sequence id="seq_1_6" db="db_1" num="6" name="INO1" comment="sequence of the region upstream from YJL153C" length="800">
+ 			<score strand="both" combined_pvalue="8.79e-07" evalue="6.2e-06"/>
+ 			<seg start="226">
+@@ -214,5 +214,5 @@
+ 			</seg>
+ 		</sequence>
+ 	</sequences>
+-	<runtime cycles="10000" seconds="0.010"/>
++	<runtime cycles="20001" seconds="0.020"/>
+ </mast>
+diff -r 81f90e1597b4 -r bd2d22b86425 tests/mast/mast.INO_up800.tcm
+--- a/tests/mast/mast.INO_up800.tcm	Wed Feb 22 14:46:22 2012 +1000
++++ b/tests/mast/mast.INO_up800.tcm	Tue Feb 28 17:57:54 2012 +1000
+@@ -62,9 +62,9 @@
+ <!ELEMENT runtime EMPTY>
+ <!ATTLIST runtime cycles CDATA #REQUIRED seconds CDATA #REQUIRED>
+ ]>
+-<mast version="4.3.2" release="Fri Apr 09 12:00:00 EST 2009">
++<mast version="4.8.1" release="Tue Feb 28 17:11:35 EST 2012">
+ 	<model>
+-		<command_line>mast /home/james/memesvn/gomo2/scripts/../tests/meme/meme.INO_up800.tcm /home/james/memesvn/gomo2/scripts/../tests/common/INO_up800.s -oc /home/james/memesvn/gomo2/scripts/../tests/results/mast -nohtml -nostatus</command_line>
++		<command_line>mast /home/james/meme/scripts/../tests/meme/meme.INO_up800.tcm /home/james/meme/scripts/../tests/common/INO_up800.s -oc /home/james/meme/scripts/../tests/results/mast -nohtml -nostatus</command_line>
+ 		<max_correlation>0.60</max_correlation>
+ 		<remove_correlated value="n"/>
+ 		<strand_handling value="combine"/>
+@@ -74,7 +74,7 @@
+ 		<max_hit_pvalue>0.0001</max_hit_pvalue>
+ 		<max_weak_pvalue>0.0001</max_weak_pvalue>
+ 		<host>tlb-squirrel</host>
+-		<when>Fri Apr  9 17:08:52 2010</when>
++		<when>Tue Feb 28 17:27:34 2012</when>
+ 	</model>
+ 	<alphabet type="nucleotide" bg_source="preset">
+ 		<letter symbol="A" bg_value="0.274"/>
+@@ -82,13 +82,13 @@
+ 		<letter symbol="G" bg_value="0.225"/>
+ 		<letter symbol="T" bg_value="0.274"/>
+ 	</alphabet>
+-	<motifs source="/home/james/memesvn/gomo2/scripts/../tests/meme/meme.INO_up800.tcm" name="/home/james/memesvn/gomo2/scripts/../tests/meme/meme.INO_up800.tcm" last_mod_date="Mon Feb 15 12:10:16 2010">
++	<motifs source="/home/james/meme/scripts/../tests/meme/meme.INO_up800.tcm" name="/home/james/meme/scripts/../tests/meme/meme.INO_up800.tcm" last_mod_date="Tue Feb 28 17:06:39 2012">
+ 		<motif id="motif_1" num="1" name="1" width="13" best_f="TTCACATGCCGCC" best_r="GGCGGCATGTGAA"/>
+ 		<motif id="motif_2" num="2" name="2" width="29" best_f="TTGTCTCCTTTCTTGCTGTTCTTCACGTC" best_r="GACGTGAAGAACAGCAAGAAAGGAGACAA"/>
+-		<correlation motif_a="motif_1" motif_b="motif_2" value="0.36"/>
++		<correlation motif_a="motif_1" motif_b="motif_2" value="0.35"/>
+ 	</motifs>
+ 	<sequences>
+-		<database id="db_1" num="1" source="/home/james/memesvn/gomo2/scripts/../tests/common/INO_up800.s" name="/home/james/memesvn/gomo2/scripts/../tests/common/INO_up800.s" last_mod_date="Mon Feb 15 12:10:17 2010" seq_count="7" residue_count="5600" type="nucleotide"/>
++		<database id="db_1" num="1" source="/home/james/meme/scripts/../tests/common/INO_up800.s" name="/home/james/meme/scripts/../tests/common/INO_up800.s" last_mod_date="Wed Nov  9 18:52:42 2011" seq_count="7" residue_count="5600" type="nucleotide"/>
+ 		<sequence id="seq_1_6" db="db_1" num="6" name="INO1" comment="sequence of the region upstream from YJL153C" length="800">
+ 			<score strand="both" combined_pvalue="3.68e-12" evalue="2.6e-11"/>
+ 			<seg start="76">
+@@ -302,5 +302,5 @@
+ 			</seg>
+ 		</sequence>
+ 	</sequences>
+-	<runtime cycles="0" seconds="0.000"/>
++	<runtime cycles="24001" seconds="0.024"/>
+ </mast>
+diff -r 81f90e1597b4 -r bd2d22b86425 tests/mast/mast.INO_up800.zoops
+--- a/tests/mast/mast.INO_up800.zoops	Wed Feb 22 14:46:22 2012 +1000
++++ b/tests/mast/mast.INO_up800.zoops	Tue Feb 28 17:57:54 2012 +1000
+@@ -62,9 +62,9 @@
+ <!ELEMENT runtime EMPTY>
+ <!ATTLIST runtime cycles CDATA #REQUIRED seconds CDATA #REQUIRED>
+ ]>
+-<mast version="4.3.2" release="Fri Apr 09 12:00:00 EST 2009">
++<mast version="4.8.1" release="Tue Feb 28 17:11:35 EST 2012">
+ 	<model>
+-		<command_line>mast /home/james/memesvn/gomo2/scripts/../tests/meme/meme.INO_up800.zoops /home/james/memesvn/gomo2/scripts/../tests/common/INO_up800.s -oc /home/james/memesvn/gomo2/scripts/../tests/results/mast -nohtml -nostatus</command_line>
++		<command_line>mast /home/james/meme/scripts/../tests/meme/meme.INO_up800.zoops /home/james/meme/scripts/../tests/common/INO_up800.s -oc /home/james/meme/scripts/../tests/results/mast -nohtml -nostatus</command_line>
+ 		<max_correlation>0.60</max_correlation>
+ 		<remove_correlated value="n"/>
+ 		<strand_handling value="combine"/>
+@@ -74,7 +74,7 @@
+ 		<max_hit_pvalue>0.0001</max_hit_pvalue>
+ 		<max_weak_pvalue>0.0001</max_weak_pvalue>
+ 		<host>tlb-squirrel</host>
+-		<when>Fri Apr  9 17:08:52 2010</when>
++		<when>Tue Feb 28 17:27:34 2012</when>
+ 	</model>
+ 	<alphabet type="nucleotide" bg_source="preset">
+ 		<letter symbol="A" bg_value="0.274"/>
+@@ -82,57 +82,27 @@
+ 		<letter symbol="G" bg_value="0.225"/>
+ 		<letter symbol="T" bg_value="0.274"/>
+ 	</alphabet>
+-	<motifs source="/home/james/memesvn/gomo2/scripts/../tests/meme/meme.INO_up800.zoops" name="/home/james/memesvn/gomo2/scripts/../tests/meme/meme.INO_up800.zoops" last_mod_date="Mon Feb 15 12:10:16 2010">
++	<motifs source="/home/james/meme/scripts/../tests/meme/meme.INO_up800.zoops" name="/home/james/meme/scripts/../tests/meme/meme.INO_up800.zoops" last_mod_date="Tue Feb 28 17:06:39 2012">
+ 		<motif id="motif_1" num="1" name="1" width="17" best_f="GGCGGCATGTGAAAAGT" best_r="ACTTTTCACATGCCGCC"/>
+-		<motif id="motif_2" num="2" name="2" width="10" best_f="TCTGGCACAG" best_r="CTGTGCCAGA"/>
+-		<correlation motif_a="motif_1" motif_b="motif_2" value="0.24"/>
++		<motif id="motif_2" num="2" name="2" width="21" best_f="CACGGCCCCATCACCACTGTC" best_r="GACAGTGGTGATGGGGCCGTG"/>
++		<correlation motif_a="motif_1" motif_b="motif_2" value="0.22"/>
+ 	</motifs>
+ 	<sequences>
+-		<database id="db_1" num="1" source="/home/james/memesvn/gomo2/scripts/../tests/common/INO_up800.s" name="/home/james/memesvn/gomo2/scripts/../tests/common/INO_up800.s" last_mod_date="Mon Feb 15 12:10:17 2010" seq_count="7" residue_count="5600" type="nucleotide"/>
+-		<sequence id="seq_1_1" db="db_1" num="1" name="CHO1" comment="sequence of the region upstream from YER026C" length="800">
+-			<score strand="both" combined_pvalue="8.80e-07" evalue="6.2e-06"/>
+-			<seg start="526">
+-				<data>
+-CAATCCCCACTCCTTCTCAATGTGTGCAGACTTCTGTGCCAGACACTGAATATATATCAGTAATTGGTCAAAATC
+-				</data>
+-				<hit pos="559" gap="558" motif="motif_2" pvalue="7.4e-07" strand="reverse" match="++++++++++"/>
+-			</seg>
+-			<seg start="601">
+-				<data>
+-ACTTTGAACGTTCACACGGCACCCTCACGCCTTTGAGCTTTCACATGGACCCATCTAAAGATGAAGATCCGTATT
+-				</data>
+-				<hit pos="607" gap="38" motif="motif_1" pvalue="3.9e-05" strand="reverse" match="+   ++++++ +++ ++"/>
+-				<hit pos="636" gap="12" motif="motif_1" pvalue="2.7e-08" strand="reverse" match="++ ++++++++++ +++"/>
+-			</seg>
+-		</sequence>
+-		<sequence id="seq_1_5" db="db_1" num="5" name="ACC1" comment="sequence of the region upstream from YNR016C" length="800">
+-			<score strand="both" combined_pvalue="8.80e-07" evalue="6.2e-06"/>
+-			<seg start="76">
+-				<data>
+-TAAAATCTTCACATGGCCCGGCCGCGCGCGCGTTGTGCCAACAAGTCGCAGTCGAAATTCAACCGCTCATTGCCA
+-				</data>
+-				<hit pos="79" gap="78" motif="motif_1" pvalue="2.7e-08" strand="reverse" match="+ ++++++++++++++ "/>
+-			</seg>
+-			<seg start="226">
+-				<data>
+-TCGTATTCTGGCACAGTATAGCCTAGCACAATCACTGTCACAATTGTTATCGGTTCTACAATTGTTCTGCTCTCT
+-				</data>
+-				<hit pos="232" gap="136" motif="motif_2" pvalue="7.4e-07" strand="forward" match="++++++++++"/>
+-			</seg>
+-		</sequence>
++		<database id="db_1" num="1" source="/home/james/meme/scripts/../tests/common/INO_up800.s" name="/home/james/meme/scripts/../tests/common/INO_up800.s" last_mod_date="Wed Nov  9 18:52:42 2011" seq_count="7" residue_count="5600" type="nucleotide"/>
+ 		<sequence id="seq_1_6" db="db_1" num="6" name="INO1" comment="sequence of the region upstream from YJL153C" length="800">
+-			<score strand="both" combined_pvalue="9.47e-07" evalue="6.6e-06"/>
++			<score strand="both" combined_pvalue="3.33e-10" evalue="2.3e-09"/>
+ 			<seg start="301">
+ 				<data>
+ GTGACCTGGAAGCTCACCCTGCAGAGGAATCTCAAGCACAGCCTCCAGCATATGATGAAGACGATGAGGCCGGTG
++CCGATGTGCCCTTGATGGACAACAAACAACAGCTCTCTTCCGGCCGTACTTAGTGATCGGAACGAGCTCTTTATC
+ 				</data>
+-				<hit pos="332" gap="331" motif="motif_2" pvalue="2.0e-05" strand="forward" match="++  ++++++"/>
++				<hit pos="369" gap="368" motif="motif_2" pvalue="4.7e-09" strand="reverse" match="+ + +++ +++++++++++++"/>
+ 			</seg>
+ 			<seg start="526">
+ 				<data>
+ TGAAATACGTGCCGGTGTTCCGGGGTTGGATGCGGAATCGAAAGTGTTGAATGTGAAATATGCGGAGGCCAAGTA
+ 				</data>
+-				<hit pos="570" gap="228" motif="motif_1" pvalue="8.5e-05" strand="forward" match=" +  + ++++++++  +"/>
++				<hit pos="570" gap="180" motif="motif_1" pvalue="8.5e-05" strand="forward" match=" +  + ++++++++  +"/>
+ 			</seg>
+ 			<seg start="601">
+ 				<data>
+@@ -141,19 +111,34 @@
+ 				<hit pos="619" gap="32" motif="motif_1" pvalue="1.1e-09" strand="forward" match=" ++++++++++++++++"/>
+ 			</seg>
+ 		</sequence>
++		<sequence id="seq_1_4" db="db_1" num="4" name="FAS2" comment="sequence of the region upstream from YPL231W" length="800">
++			<score strand="both" combined_pvalue="1.21e-09" evalue="8.5e-09"/>
++			<seg start="526">
++				<data>
++GCTTAGCAAAATCCAACCATTTTTTTTTTATCTCCCGCGTTTTCACATGCTACCTCATTCGCCTCGTAACGTTAC
++				</data>
++				<hit pos="563" gap="562" motif="motif_1" pvalue="1.1e-07" strand="reverse" match=" ++++++++++++  ++"/>
++			</seg>
++			<seg start="676">
++				<data>
++TGCCTCATATATAACTTGTTAACTGAAGGTTACACAAGACCACATCACCACTGTCGTGCTTTTCTAATAACCGCT
++				</data>
++				<hit pos="710" gap="130" motif="motif_2" pvalue="1.7e-10" strand="forward" match="++++ ++++++++++++++++"/>
++			</seg>
++		</sequence>
+ 		<sequence id="seq_1_7" db="db_1" num="7" name="OPI3" comment="sequence of the region upstream from YJR073C" length="800">
+-			<score strand="both" combined_pvalue="2.47e-06" evalue="1.7e-05"/>
+-			<seg start="151">
++			<score strand="both" combined_pvalue="3.26e-08" evalue="2.3e-07"/>
++			<seg start="451">
+ 				<data>
+-GTTAATCTGATCAACGCTACGCCGATGACAACGGTCTGTGCCAGATCTGGTTTTCCCCACTTATTTGCTACTTCC
++TGTGTATCGGGGACTTCTCTTAGAGTAGAAGCGTCTATAAACCCAGGTGGGACGACAGTAGTGATGGCGCCGCCG
+ 				</data>
+-				<hit pos="186" gap="185" motif="motif_2" pvalue="7.4e-07" strand="reverse" match="++++++++++"/>
++				<hit pos="504" gap="503" motif="motif_2" pvalue="7.8e-09" strand="reverse" match="++++++++++++++ ++++  "/>
+ 			</seg>
+ 			<seg start="526">
+ 				<data>
+ TATAATTCGACTTCCTTGTTGTTCATGCTTCCTTGATGACCAGGGTAGGTGTCAATGAGAGTGCATGTGGAAAGT
+ 				</data>
+-				<hit pos="584" gap="388" motif="motif_1" pvalue="8.1e-08" strand="forward" match="+ + +++++++ +++++"/>
++				<hit pos="584" gap="59" motif="motif_1" pvalue="8.1e-08" strand="forward" match="+ + +++++++ +++++"/>
+ 			</seg>
+ 			<seg start="601">
+ 				<data>
+@@ -162,51 +147,51 @@
+ 				<hit pos="633" gap="32" motif="motif_1" pvalue="5.9e-05" strand="reverse" match="+ ++++++ ++++   +"/>
+ 			</seg>
+ 		</sequence>
++		<sequence id="seq_1_5" db="db_1" num="5" name="ACC1" comment="sequence of the region upstream from YNR016C" length="800">
++			<score strand="both" combined_pvalue="6.29e-08" evalue="4.4e-07"/>
++			<seg start="76">
++				<data>
++TAAAATCTTCACATGGCCCGGCCGCGCGCGCGTTGTGCCAACAAGTCGCAGTCGAAATTCAACCGCTCATTGCCA
++CTCTCTCTACTGCTTGGTGAACTAGGCTATACGCTCAATCAGCGCCAAGATATATAAGAAGAACAGCACTCCCAG
++				</data>
++				<hit pos="79" gap="78" motif="motif_1" pvalue="2.7e-08" strand="reverse" match="+ ++++++++++++++ "/>
++				<hit pos="135" gap="39" motif="motif_2" pvalue="4.6e-08" strand="forward" match="+++ +++ +++ +++++++++"/>
++			</seg>
++		</sequence>
+ 		<sequence id="seq_1_3" db="db_1" num="3" name="FAS1" comment="sequence of the region upstream from YKL182W" length="800">
+-			<score strand="both" combined_pvalue="7.44e-06" evalue="5.2e-05"/>
++			<score strand="both" combined_pvalue="1.38e-07" evalue="9.7e-07"/>
+ 			<seg start="1">
+ 				<data>
+ CCGGGTTATAGCAGCGTCTGCTCCGCATCACGATACACGAGGTGCAGGCACGGTTCACTACTCCCCTGGCCTCCA
+ 				</data>
+-				<hit pos="44" gap="43" motif="motif_2" pvalue="1.4e-05" strand="forward" match=" + +++++ +"/>
++				<hit pos="45" gap="44" motif="motif_2" pvalue="2.0e-07" strand="forward" match="++ ++ +   +++++++++ +"/>
+ 			</seg>
+ 			<seg start="76">
+ 				<data>
+ ACAAACGACGGCCAAAAACTTCACATGCCGCCCAGCCAAGCATAATTACGCAACAGCGATCTTTCCGTCGCACAA
+ 				</data>
+-				<hit pos="91" gap="37" motif="motif_1" pvalue="1.4e-08" strand="reverse" match="+  ++++++++++++++"/>
++				<hit pos="91" gap="25" motif="motif_1" pvalue="1.4e-08" strand="reverse" match="+  ++++++++++++++"/>
++			</seg>
++		</sequence>
++		<sequence id="seq_1_1" db="db_1" num="1" name="CHO1" comment="sequence of the region upstream from YER026C" length="800">
++			<score strand="both" combined_pvalue="1.94e-07" evalue="1.4e-06"/>
++			<seg start="601">
++				<data>
++ACTTTGAACGTTCACACGGCACCCTCACGCCTTTGAGCTTTCACATGGACCCATCTAAAGATGAAGATCCGTATT
++				</data>
++				<hit pos="615" gap="614" motif="motif_2" pvalue="1.5e-07" strand="forward" match="++++++ ++ ++++  ++ + "/>
++				<hit pos="636" gap="0" motif="motif_1" pvalue="2.7e-08" strand="reverse" match="++ ++++++++++ +++"/>
+ 			</seg>
+ 		</sequence>
+ 		<sequence id="seq_1_2" db="db_1" num="2" name="CHO2" comment="sequence of the region upstream from YGR157W" length="800">
+-			<score strand="both" combined_pvalue="1.02e-05" evalue="7.1e-05"/>
++			<score strand="both" combined_pvalue="2.76e-04" evalue="0.0019"/>
+ 			<seg start="301">
+ 				<data>
+ ATATATATTTTTGCCTTGGTTTAAATTGGTCAAGACAGTCAATTGCCACACTTTTCTCATGCCGCATTCATTATT
+ 				</data>
+ 				<hit pos="350" gap="349" motif="motif_1" pvalue="1.5e-08" strand="reverse" match="+++++++ ++++++++ "/>
+ 			</seg>
+-			<seg start="376">
+-				<data>
+-CGCGAAGTTTTCCACACAAAACTGTGAAAATGAACGGCGATGCCAGAAACGGCAAAACCTCAAATGTTAGATAAC
+-				</data>
+-				<hit pos="413" gap="46" motif="motif_2" pvalue="1.8e-05" strand="reverse" match="+  +++++++"/>
+-			</seg>
+-		</sequence>
+-		<sequence id="seq_1_4" db="db_1" num="4" name="FAS2" comment="sequence of the region upstream from YPL231W" length="800">
+-			<score strand="both" combined_pvalue="6.66e-05" evalue="0.00047"/>
+-			<seg start="151">
+-				<data>
+-AACAGGGTGTCGGTCATACCGATAAAGCCGTCAAGAGTGCCAGAAAAGCAAGAAAGAACAAGATTAGATGTTGGT
+-				</data>
+-				<hit pos="185" gap="184" motif="motif_2" pvalue="1.8e-05" strand="reverse" match="  ++++++++"/>
+-			</seg>
+-			<seg start="526">
+-				<data>
+-GCTTAGCAAAATCCAACCATTTTTTTTTTATCTCCCGCGTTTTCACATGCTACCTCATTCGCCTCGTAACGTTAC
+-				</data>
+-				<hit pos="563" gap="368" motif="motif_1" pvalue="1.1e-07" strand="reverse" match=" ++++++++++++  ++"/>
+-			</seg>
+ 		</sequence>
+ 	</sequences>
+-	<runtime cycles="0" seconds="0.000"/>
++	<runtime cycles="20001" seconds="0.020"/>
+ </mast>
+diff -r 81f90e1597b4 -r bd2d22b86425 tests/mast/mast.adh.oops
+--- a/tests/mast/mast.adh.oops	Wed Feb 22 14:46:22 2012 +1000
++++ b/tests/mast/mast.adh.oops	Tue Feb 28 17:57:54 2012 +1000
+@@ -62,9 +62,9 @@
+ <!ELEMENT runtime EMPTY>
+ <!ATTLIST runtime cycles CDATA #REQUIRED seconds CDATA #REQUIRED>
+ ]>
+-<mast version="4.3.2" release="Fri Apr 09 12:00:00 EST 2009">
++<mast version="4.8.1" release="Tue Feb 28 17:11:35 EST 2012">
+ 	<model>
+-		<command_line>mast /home/james/memesvn/gomo2/scripts/../tests/meme/meme.adh.oops /home/james/memesvn/gomo2/scripts/../tests/common/adh.s -oc /home/james/memesvn/gomo2/scripts/../tests/results/mast -nohtml -nostatus</command_line>
++		<command_line>mast /home/james/meme/scripts/../tests/meme/meme.adh.oops /home/james/meme/scripts/../tests/common/adh.s -oc /home/james/meme/scripts/../tests/results/mast -nohtml -nostatus</command_line>
+ 		<max_correlation>0.60</max_correlation>
+ 		<remove_correlated value="n"/>
+ 		<strand_handling value="protein"/>
+@@ -74,7 +74,7 @@
+ 		<max_hit_pvalue>0.0001</max_hit_pvalue>
+ 		<max_weak_pvalue>0.0001</max_weak_pvalue>
+ 		<host>tlb-squirrel</host>
+-		<when>Fri Apr  9 17:08:53 2010</when>
++		<when>Tue Feb 28 17:27:35 2012</when>
+ 	</model>
+ 	<alphabet type="amino-acid" bg_source="preset">
+ 		<letter symbol="A" bg_value="0.073"/>
+@@ -98,13 +98,13 @@
+ 		<letter symbol="W" bg_value="0.013"/>
+ 		<letter symbol="Y" bg_value="0.033"/>
+ 	</alphabet>
+-	<motifs source="/home/james/memesvn/gomo2/scripts/../tests/meme/meme.adh.oops" name="/home/james/memesvn/gomo2/scripts/../tests/meme/meme.adh.oops" last_mod_date="Mon Feb 15 12:10:16 2010">
++	<motifs source="/home/james/meme/scripts/../tests/meme/meme.adh.oops" name="/home/james/meme/scripts/../tests/meme/meme.adh.oops" last_mod_date="Tue Feb 28 17:06:39 2012">
+ 		<motif id="motif_1" num="1" name="1" width="29" best_f="YSASKFAVRMLTRSMAHEYAPHGIRVNCI"/>
+ 		<motif id="motif_2" num="2" name="2" width="29" best_f="KVVLITGCSSGIGKATAKHLHKEGAWVVL"/>
+ 		<correlation motif_a="motif_1" motif_b="motif_2" value="0.30"/>
+ 	</motifs>
+ 	<sequences>
+-		<database id="db_1" num="1" source="/home/james/memesvn/gomo2/scripts/../tests/common/adh.s" name="/home/james/memesvn/gomo2/scripts/../tests/common/adh.s" last_mod_date="Mon Feb 15 12:10:17 2010" seq_count="33" residue_count="9996" type="amino-acid"/>
++		<database id="db_1" num="1" source="/home/james/meme/scripts/../tests/common/adh.s" name="/home/james/meme/scripts/../tests/common/adh.s" last_mod_date="Wed Nov  9 18:52:42 2011" seq_count="33" residue_count="9996" type="amino-acid"/>
+ 		<sequence id="seq_1_22" db="db_1" num="22" name="YRTP_BACSU" comment="HYPOTHETICAL 25.3 KD PROTEIN IN RTP 5'REGION (ORF238)" length="238">
+ 			<score strand="both" combined_pvalue="3.05e-35" evalue="1e-33"/>
+ 			<seg start="1">
+@@ -634,5 +634,5 @@
+ 			</seg>
+ 		</sequence>
+ 	</sequences>
+-	<runtime cycles="20000" seconds="0.020"/>
++	<runtime cycles="80005" seconds="0.080"/>
+ </mast>
+diff -r 81f90e1597b4 -r bd2d22b86425 tests/mast/mast.adh.oops.mini-drosoph.s
+--- a/tests/mast/mast.adh.oops.mini-drosoph.s	Wed Feb 22 14:46:22 2012 +1000
++++ b/tests/mast/mast.adh.oops.mini-drosoph.s	Tue Feb 28 17:57:54 2012 +1000
+@@ -62,9 +62,9 @@
+ <!ELEMENT runtime EMPTY>
+ <!ATTLIST runtime cycles CDATA #REQUIRED seconds CDATA #REQUIRED>
+ ]>
+-<mast version="4.3.2" release="Fri Apr 09 12:00:00 EST 2009">
++<mast version="4.8.1" release="Tue Feb 28 17:11:35 EST 2012">
+ 	<model>
+-		<command_line>mast /home/james/memesvn/gomo2/scripts/../tests/meme/meme.adh.oops - -oc /home/james/memesvn/gomo2/scripts/../tests/results/mast -nohtml -nostatus -df stdin -dna -seqp</command_line>
++		<command_line>mast /home/james/meme/scripts/../tests/meme/meme.adh.oops - -oc /home/james/meme/scripts/../tests/results/mast -nohtml -nostatus -df stdin -dna -seqp</command_line>
+ 		<max_correlation>0.60</max_correlation>
+ 		<remove_correlated value="n"/>
+ 		<strand_handling value="combine"/>
+@@ -74,7 +74,7 @@
+ 		<max_hit_pvalue>0.0001</max_hit_pvalue>
+ 		<max_weak_pvalue>0.0001</max_weak_pvalue>
+ 		<host>tlb-squirrel</host>
+-		<when>Fri Apr  9 17:08:53 2010</when>
++		<when>Tue Feb 28 17:27:36 2012</when>
+ 	</model>
+ 	<alphabet type="amino-acid" bg_source="preset">
+ 		<letter symbol="A" bg_value="0.070"/>
+@@ -98,13 +98,13 @@
+ 		<letter symbol="W" bg_value="0.016"/>
+ 		<letter symbol="Y" bg_value="0.022"/>
+ 	</alphabet>
+-	<motifs source="/home/james/memesvn/gomo2/scripts/../tests/meme/meme.adh.oops" name="/home/james/memesvn/gomo2/scripts/../tests/meme/meme.adh.oops" last_mod_date="Mon Feb 15 12:10:16 2010">
++	<motifs source="/home/james/meme/scripts/../tests/meme/meme.adh.oops" name="/home/james/meme/scripts/../tests/meme/meme.adh.oops" last_mod_date="Tue Feb 28 17:06:39 2012">
+ 		<motif id="motif_1" num="1" name="1" width="29" best_f="YSASKFAVRMLTRSMAHEYAPHGIRVNCI"/>
+ 		<motif id="motif_2" num="2" name="2" width="29" best_f="KVVLITGCSSGIGKATAKHLHKEGAWVVL"/>
+ 		<correlation motif_a="motif_1" motif_b="motif_2" value="0.30"/>
+ 	</motifs>
+ 	<sequences>
+-		<database id="db_1" num="1" source="-" name="stdin" last_mod_date="Fri Apr  9 17:08:53 2010" seq_count="4" residue_count="499297" type="nucleotide"/>
++		<database id="db_1" num="1" source="-" name="stdin" last_mod_date="Tue Feb 28 17:27:35 2012" seq_count="4" residue_count="499297" type="nucleotide"/>
+ 		<sequence id="seq_1_3" db="db_1" num="3" name="gi|7296683|gb|AE003602.1|AE003602" comment="Drosophila melanogaster genomic scaffold 142000013386043 section 3 of 8, complete sequence" length="297266">
+ 			<score strand="both" combined_pvalue="1.21e-23" evalue="4.8e-23" frame="b"/>
+ 			<seg start="101626">
+@@ -181,5 +181,5 @@
+ 			<score strand="both" combined_pvalue="1.19e-01" evalue="0.48" frame="a"/>
+ 		</sequence>
+ 	</sequences>
+-	<runtime cycles="1250000" seconds="1.250"/>
++	<runtime cycles="1220076" seconds="1.220"/>
+ </mast>
+diff -r 81f90e1597b4 -r bd2d22b86425 tests/mast/mast.adh.tcm
+--- a/tests/mast/mast.adh.tcm	Wed Feb 22 14:46:22 2012 +1000
++++ b/tests/mast/mast.adh.tcm	Tue Feb 28 17:57:54 2012 +1000
+@@ -62,9 +62,9 @@
+ <!ELEMENT runtime EMPTY>
+ <!ATTLIST runtime cycles CDATA #REQUIRED seconds CDATA #REQUIRED>
+ ]>
+-<mast version="4.3.2" release="Fri Apr 09 12:00:00 EST 2009">
++<mast version="4.8.1" release="Tue Feb 28 17:11:35 EST 2012">
+ 	<model>
+-		<command_line>mast /home/james/memesvn/gomo2/scripts/../tests/meme/meme.adh.tcm /home/james/memesvn/gomo2/scripts/../tests/common/adh.s -oc /home/james/memesvn/gomo2/scripts/../tests/results/mast -nohtml -nostatus</command_line>
++		<command_line>mast /home/james/meme/scripts/../tests/meme/meme.adh.tcm /home/james/meme/scripts/../tests/common/adh.s -oc /home/james/meme/scripts/../tests/results/mast -nohtml -nostatus</command_line>
+ 		<max_correlation>0.60</max_correlation>
+ 		<remove_correlated value="n"/>
+ 		<strand_handling value="protein"/>
+@@ -74,7 +74,7 @@
+ 		<max_hit_pvalue>0.0001</max_hit_pvalue>
+ 		<max_weak_pvalue>0.0001</max_weak_pvalue>
+ 		<host>tlb-squirrel</host>
+-		<when>Fri Apr  9 17:08:55 2010</when>
++		<when>Tue Feb 28 17:27:38 2012</when>
+ 	</model>
+ 	<alphabet type="amino-acid" bg_source="preset">
+ 		<letter symbol="A" bg_value="0.073"/>
+@@ -98,13 +98,13 @@
+ 		<letter symbol="W" bg_value="0.013"/>
+ 		<letter symbol="Y" bg_value="0.033"/>
+ 	</alphabet>
+-	<motifs source="/home/james/memesvn/gomo2/scripts/../tests/meme/meme.adh.tcm" name="/home/james/memesvn/gomo2/scripts/../tests/meme/meme.adh.tcm" last_mod_date="Mon Feb 15 12:10:16 2010">
++	<motifs source="/home/james/meme/scripts/../tests/meme/meme.adh.tcm" name="/home/james/meme/scripts/../tests/meme/meme.adh.tcm" last_mod_date="Tue Feb 28 17:06:39 2012">
+ 		<motif id="motif_1" num="1" name="1" width="21" best_f="LITGCSSGIGKAIAKHFHKEG"/>
+ 		<motif id="motif_2" num="2" name="2" width="22" best_f="YCASKFAVRGFTRSMAMEYAPY"/>
+-		<correlation motif_a="motif_1" motif_b="motif_2" value="0.35"/>
++		<correlation motif_a="motif_1" motif_b="motif_2" value="0.34"/>
+ 	</motifs>
+ 	<sequences>
+-		<database id="db_1" num="1" source="/home/james/memesvn/gomo2/scripts/../tests/common/adh.s" name="/home/james/memesvn/gomo2/scripts/../tests/common/adh.s" last_mod_date="Mon Feb 15 12:10:17 2010" seq_count="33" residue_count="9996" type="amino-acid"/>
++		<database id="db_1" num="1" source="/home/james/meme/scripts/../tests/common/adh.s" name="/home/james/meme/scripts/../tests/common/adh.s" last_mod_date="Wed Nov  9 18:52:42 2011" seq_count="33" residue_count="9996" type="amino-acid"/>
+ 		<sequence id="seq_1_22" db="db_1" num="22" name="YRTP_BACSU" comment="HYPOTHETICAL 25.3 KD PROTEIN IN RTP 5'REGION (ORF238)" length="238">
+ 			<score strand="both" combined_pvalue="1.37e-30" evalue="4.5e-29"/>
+ 			<seg start="1">
+@@ -599,5 +599,5 @@
+ 			</seg>
+ 		</sequence>
+ 	</sequences>
+-	<runtime cycles="20000" seconds="0.020"/>
++	<runtime cycles="68004" seconds="0.068"/>
+ </mast>
+diff -r 81f90e1597b4 -r bd2d22b86425 tests/mast/mast.adh.tcm.mini-drosoph.s
+--- a/tests/mast/mast.adh.tcm.mini-drosoph.s	Wed Feb 22 14:46:22 2012 +1000
++++ b/tests/mast/mast.adh.tcm.mini-drosoph.s	Tue Feb 28 17:57:54 2012 +1000
+@@ -62,9 +62,9 @@
+ <!ELEMENT runtime EMPTY>
+ <!ATTLIST runtime cycles CDATA #REQUIRED seconds CDATA #REQUIRED>
+ ]>
+-<mast version="4.3.2" release="Fri Apr 09 12:00:00 EST 2009">
++<mast version="4.8.1" release="Tue Feb 28 17:11:35 EST 2012">
+ 	<model>
+-		<command_line>mast /home/james/memesvn/gomo2/scripts/../tests/meme/meme.adh.tcm - -oc /home/james/memesvn/gomo2/scripts/../tests/results/mast -nohtml -nostatus -df stdin -dna -seqp</command_line>
++		<command_line>mast /home/james/meme/scripts/../tests/meme/meme.adh.tcm - -oc /home/james/meme/scripts/../tests/results/mast -nohtml -nostatus -df stdin -dna -seqp</command_line>
+ 		<max_correlation>0.60</max_correlation>
+ 		<remove_correlated value="n"/>
+ 		<strand_handling value="combine"/>
+@@ -74,7 +74,7 @@
+ 		<max_hit_pvalue>0.0001</max_hit_pvalue>
+ 		<max_weak_pvalue>0.0001</max_weak_pvalue>
+ 		<host>tlb-squirrel</host>
+-		<when>Fri Apr  9 17:08:56 2010</when>
++		<when>Tue Feb 28 17:27:38 2012</when>
+ 	</model>
+ 	<alphabet type="amino-acid" bg_source="preset">
+ 		<letter symbol="A" bg_value="0.070"/>
+@@ -98,13 +98,13 @@
+ 		<letter symbol="W" bg_value="0.016"/>
+ 		<letter symbol="Y" bg_value="0.022"/>
+ 	</alphabet>
+-	<motifs source="/home/james/memesvn/gomo2/scripts/../tests/meme/meme.adh.tcm" name="/home/james/memesvn/gomo2/scripts/../tests/meme/meme.adh.tcm" last_mod_date="Mon Feb 15 12:10:16 2010">
++	<motifs source="/home/james/meme/scripts/../tests/meme/meme.adh.tcm" name="/home/james/meme/scripts/../tests/meme/meme.adh.tcm" last_mod_date="Tue Feb 28 17:06:39 2012">
+ 		<motif id="motif_1" num="1" name="1" width="21" best_f="LITGCSSGIGKAIAKHFHKEG"/>
+ 		<motif id="motif_2" num="2" name="2" width="22" best_f="YCASKFAVRGFTRSMAMEYAPY"/>
+-		<correlation motif_a="motif_1" motif_b="motif_2" value="0.35"/>
++		<correlation motif_a="motif_1" motif_b="motif_2" value="0.34"/>
+ 	</motifs>
+ 	<sequences>
+-		<database id="db_1" num="1" source="-" name="stdin" last_mod_date="Fri Apr  9 17:08:55 2010" seq_count="4" residue_count="499297" type="nucleotide"/>
++		<database id="db_1" num="1" source="-" name="stdin" last_mod_date="Tue Feb 28 17:27:38 2012" seq_count="4" residue_count="499297" type="nucleotide"/>
+ 		<sequence id="seq_1_3" db="db_1" num="3" name="gi|7296683|gb|AE003602.1|AE003602" comment="Drosophila melanogaster genomic scaffold 142000013386043 section 3 of 8, complete sequence" length="297266">
+ 			<score strand="both" combined_pvalue="1.57e-16" evalue="6.3e-16" frame="b"/>
+ 			<seg start="101626">
+@@ -173,5 +173,5 @@
+ 			<score strand="both" combined_pvalue="3.71e-01" evalue="1.5" frame="a"/>
+ 		</sequence>
+ 	</sequences>
+-	<runtime cycles="990000" seconds="0.990"/>
++	<runtime cycles="980061" seconds="0.980"/>
+ </mast>
+diff -r 81f90e1597b4 -r bd2d22b86425 tests/mast/mast.adh.zoops
+--- a/tests/mast/mast.adh.zoops	Wed Feb 22 14:46:22 2012 +1000
++++ b/tests/mast/mast.adh.zoops	Tue Feb 28 17:57:54 2012 +1000
+@@ -62,9 +62,9 @@
+ <!ELEMENT runtime EMPTY>
+ <!ATTLIST runtime cycles CDATA #REQUIRED seconds CDATA #REQUIRED>
+ ]>
+-<mast version="4.3.2" release="Fri Apr 09 12:00:00 EST 2009">
++<mast version="4.8.1" release="Tue Feb 28 17:11:35 EST 2012">
+ 	<model>
+-		<command_line>mast /home/james/memesvn/gomo2/scripts/../tests/meme/meme.adh.zoops /home/james/memesvn/gomo2/scripts/../tests/common/adh.s -oc /home/james/memesvn/gomo2/scripts/../tests/results/mast -nohtml -nostatus</command_line>
++		<command_line>mast /home/james/meme/scripts/../tests/meme/meme.adh.zoops /home/james/meme/scripts/../tests/common/adh.s -oc /home/james/meme/scripts/../tests/results/mast -nohtml -nostatus</command_line>
+ 		<max_correlation>0.60</max_correlation>
+ 		<remove_correlated value="n"/>
+ 		<strand_handling value="protein"/>
+@@ -74,7 +74,7 @@
+ 		<max_hit_pvalue>0.0001</max_hit_pvalue>
+ 		<max_weak_pvalue>0.0001</max_weak_pvalue>
+ 		<host>tlb-squirrel</host>
+-		<when>Fri Apr  9 17:08:54 2010</when>
++		<when>Tue Feb 28 17:27:36 2012</when>
+ 	</model>
+ 	<alphabet type="amino-acid" bg_source="preset">
+ 		<letter symbol="A" bg_value="0.073"/>
+@@ -98,13 +98,13 @@
+ 		<letter symbol="W" bg_value="0.013"/>
+ 		<letter symbol="Y" bg_value="0.033"/>
+ 	</alphabet>
+-	<motifs source="/home/james/memesvn/gomo2/scripts/../tests/meme/meme.adh.zoops" name="/home/james/memesvn/gomo2/scripts/../tests/meme/meme.adh.zoops" last_mod_date="Mon Feb 15 12:10:16 2010">
++	<motifs source="/home/james/meme/scripts/../tests/meme/meme.adh.zoops" name="/home/james/meme/scripts/../tests/meme/meme.adh.zoops" last_mod_date="Tue Feb 28 17:06:39 2012">
+ 		<motif id="motif_1" num="1" name="1" width="21" best_f="GKVVLITGCSSGIGKATAKHL"/>
+ 		<motif id="motif_2" num="2" name="2" width="29" best_f="SVYCASKFAVRMLTRSMAMEYAPHGIRVN"/>
+ 		<correlation motif_a="motif_1" motif_b="motif_2" value="0.30"/>
+ 	</motifs>
+ 	<sequences>
+-		<database id="db_1" num="1" source="/home/james/memesvn/gomo2/scripts/../tests/common/adh.s" name="/home/james/memesvn/gomo2/scripts/../tests/common/adh.s" last_mod_date="Mon Feb 15 12:10:17 2010" seq_count="33" residue_count="9996" type="amino-acid"/>
++		<database id="db_1" num="1" source="/home/james/meme/scripts/../tests/common/adh.s" name="/home/james/meme/scripts/../tests/common/adh.s" last_mod_date="Wed Nov  9 18:52:42 2011" seq_count="33" residue_count="9996" type="amino-acid"/>
+ 		<sequence id="seq_1_8" db="db_1" num="8" name="BUDC_KLETE" comment="ACETOIN(DIACETYL) REDUCTASE (EC 1.1.1.5) (ACETOIN DEHYDROGENASE)" length="241">
+ 			<score strand="both" combined_pvalue="3.95e-34" evalue="1.3e-32"/>
+ 			<seg start="1">
+@@ -604,5 +604,5 @@
+ 			</seg>
+ 		</sequence>
+ 	</sequences>
+-	<runtime cycles="20000" seconds="0.020"/>
++	<runtime cycles="76004" seconds="0.076"/>
+ </mast>
+diff -r 81f90e1597b4 -r bd2d22b86425 tests/mast/mast.adh.zoops.mini-drosoph.s
+--- a/tests/mast/mast.adh.zoops.mini-drosoph.s	Wed Feb 22 14:46:22 2012 +1000
++++ b/tests/mast/mast.adh.zoops.mini-drosoph.s	Tue Feb 28 17:57:54 2012 +1000
+@@ -62,9 +62,9 @@
+ <!ELEMENT runtime EMPTY>
+ <!ATTLIST runtime cycles CDATA #REQUIRED seconds CDATA #REQUIRED>
+ ]>
+-<mast version="4.3.2" release="Fri Apr 09 12:00:00 EST 2009">
++<mast version="4.8.1" release="Tue Feb 28 17:11:35 EST 2012">
+ 	<model>
+-		<command_line>mast /home/james/memesvn/gomo2/scripts/../tests/meme/meme.adh.zoops - -oc /home/james/memesvn/gomo2/scripts/../tests/results/mast -nohtml -nostatus -df stdin -dna -seqp</command_line>
++		<command_line>mast /home/james/meme/scripts/../tests/meme/meme.adh.zoops - -oc /home/james/meme/scripts/../tests/results/mast -nohtml -nostatus -df stdin -dna -seqp</command_line>
+ 		<max_correlation>0.60</max_correlation>
+ 		<remove_correlated value="n"/>
+ 		<strand_handling value="combine"/>
+@@ -74,7 +74,7 @@
+ 		<max_hit_pvalue>0.0001</max_hit_pvalue>
+ 		<max_weak_pvalue>0.0001</max_weak_pvalue>
+ 		<host>tlb-squirrel</host>
+-		<when>Fri Apr  9 17:08:55 2010</when>
++		<when>Tue Feb 28 17:27:37 2012</when>
+ 	</model>
+ 	<alphabet type="amino-acid" bg_source="preset">
+ 		<letter symbol="A" bg_value="0.070"/>
+@@ -98,13 +98,13 @@
+ 		<letter symbol="W" bg_value="0.016"/>
+ 		<letter symbol="Y" bg_value="0.022"/>
+ 	</alphabet>
+-	<motifs source="/home/james/memesvn/gomo2/scripts/../tests/meme/meme.adh.zoops" name="/home/james/memesvn/gomo2/scripts/../tests/meme/meme.adh.zoops" last_mod_date="Mon Feb 15 12:10:16 2010">
++	<motifs source="/home/james/meme/scripts/../tests/meme/meme.adh.zoops" name="/home/james/meme/scripts/../tests/meme/meme.adh.zoops" last_mod_date="Tue Feb 28 17:06:39 2012">
+ 		<motif id="motif_1" num="1" name="1" width="21" best_f="GKVVLITGCSSGIGKATAKHL"/>
+ 		<motif id="motif_2" num="2" name="2" width="29" best_f="SVYCASKFAVRMLTRSMAMEYAPHGIRVN"/>
+ 		<correlation motif_a="motif_1" motif_b="motif_2" value="0.30"/>
+ 	</motifs>
+ 	<sequences>
+-		<database id="db_1" num="1" source="-" name="stdin" last_mod_date="Fri Apr  9 17:08:54 2010" seq_count="4" residue_count="499297" type="nucleotide"/>
++		<database id="db_1" num="1" source="-" name="stdin" last_mod_date="Tue Feb 28 17:27:37 2012" seq_count="4" residue_count="499297" type="nucleotide"/>
+ 		<sequence id="seq_1_3" db="db_1" num="3" name="gi|7296683|gb|AE003602.1|AE003602" comment="Drosophila melanogaster genomic scaffold 142000013386043 section 3 of 8, complete sequence" length="297266">
+ 			<score strand="both" combined_pvalue="2.10e-22" evalue="8.4e-22" frame="b"/>
+ 			<seg start="101626">
+@@ -181,5 +181,5 @@
+ 			<score strand="both" combined_pvalue="6.97e-01" evalue="2.8" frame="a"/>
+ 		</sequence>
+ 	</sequences>
+-	<runtime cycles="1090000" seconds="1.090"/>
++	<runtime cycles="1080067" seconds="1.080"/>
+ </mast>
+diff -r 81f90e1597b4 -r bd2d22b86425 tests/mast/mast.crp0.oops
+--- a/tests/mast/mast.crp0.oops	Wed Feb 22 14:46:22 2012 +1000
++++ b/tests/mast/mast.crp0.oops	Tue Feb 28 17:57:54 2012 +1000
+@@ -62,9 +62,9 @@
+ <!ELEMENT runtime EMPTY>
+ <!ATTLIST runtime cycles CDATA #REQUIRED seconds CDATA #REQUIRED>
+ ]>
+-<mast version="4.3.2" release="Fri Apr 09 12:00:00 EST 2009">
++<mast version="4.8.1" release="Tue Feb 28 17:11:35 EST 2012">
+ 	<model>
+-		<command_line>mast /home/james/memesvn/gomo2/scripts/../tests/meme/meme.crp0.oops /home/james/memesvn/gomo2/scripts/../tests/common/crp0.s -oc /home/james/memesvn/gomo2/scripts/../tests/results/mast -nohtml -nostatus</command_line>
++		<command_line>mast /home/james/meme/scripts/../tests/meme/meme.crp0.oops /home/james/meme/scripts/../tests/common/crp0.s -oc /home/james/meme/scripts/../tests/results/mast -nohtml -nostatus</command_line>
+ 		<max_correlation>0.60</max_correlation>
+ 		<remove_correlated value="n"/>
+ 		<strand_handling value="combine"/>
+@@ -74,7 +74,7 @@
+ 		<max_hit_pvalue>0.0001</max_hit_pvalue>
+ 		<max_weak_pvalue>0.0001</max_weak_pvalue>
+ 		<host>tlb-squirrel</host>
+-		<when>Mon Apr 12 09:38:55 2010</when>
++		<when>Tue Feb 28 17:27:34 2012</when>
+ 	</model>
+ 	<alphabet type="nucleotide" bg_source="preset">
+ 		<letter symbol="A" bg_value="0.274"/>
+@@ -82,13 +82,13 @@
+ 		<letter symbol="G" bg_value="0.225"/>
+ 		<letter symbol="T" bg_value="0.274"/>
+ 	</alphabet>
+-	<motifs source="/home/james/memesvn/gomo2/scripts/../tests/meme/meme.crp0.oops" name="/home/james/memesvn/gomo2/scripts/../tests/meme/meme.crp0.oops" last_mod_date="Mon Feb 15 12:10:16 2010">
++	<motifs source="/home/james/meme/scripts/../tests/meme/meme.crp0.oops" name="/home/james/meme/scripts/../tests/meme/meme.crp0.oops" last_mod_date="Tue Feb 28 17:06:39 2012">
+ 		<motif id="motif_1" num="1" name="1" width="15" best_f="GTGACCCGGTTCACA" best_r="TGTGAACCGGGTCAC"/>
+ 		<motif id="motif_2" num="2" name="2" width="11" best_f="CGCATAACAAA" best_r="TTTGTTATGCG"/>
+-		<correlation motif_a="motif_1" motif_b="motif_2" value="0.34"/>
++		<correlation motif_a="motif_1" motif_b="motif_2" value="0.36"/>
+ 	</motifs>
+ 	<sequences>
+-		<database id="db_1" num="1" source="/home/james/memesvn/gomo2/scripts/../tests/common/crp0.s" name="/home/james/memesvn/gomo2/scripts/../tests/common/crp0.s" last_mod_date="Mon Feb 15 12:10:17 2010" seq_count="18" residue_count="1890" type="nucleotide"/>
++		<database id="db_1" num="1" source="/home/james/meme/scripts/../tests/common/crp0.s" name="/home/james/meme/scripts/../tests/common/crp0.s" last_mod_date="Wed Nov  9 18:52:42 2011" seq_count="18" residue_count="1890" type="nucleotide"/>
+ 		<sequence id="seq_1_2" db="db_1" num="2" name="ara" comment="17 55" length="105">
+ 			<score strand="both" combined_pvalue="1.96e-06" evalue="3.5e-05"/>
+ 			<seg start="1">
+@@ -277,5 +277,5 @@
+ 			</seg>
+ 		</sequence>
+ 	</sequences>
+-	<runtime cycles="0" seconds="0.000"/>
++	<runtime cycles="8000" seconds="0.008"/>
+ </mast>
+diff -r 81f90e1597b4 -r bd2d22b86425 tests/mast/mast.crp0.tcm
+--- a/tests/mast/mast.crp0.tcm	Wed Feb 22 14:46:22 2012 +1000
++++ b/tests/mast/mast.crp0.tcm	Tue Feb 28 17:57:54 2012 +1000
+@@ -62,9 +62,9 @@
+ <!ELEMENT runtime EMPTY>
+ <!ATTLIST runtime cycles CDATA #REQUIRED seconds CDATA #REQUIRED>
+ ]>
+-<mast version="4.3.2" release="Fri Apr 09 12:00:00 EST 2009">
++<mast version="4.8.1" release="Tue Feb 28 17:11:35 EST 2012">
+ 	<model>
+-		<command_line>mast /home/james/memesvn/gomo2/scripts/../tests/meme/meme.crp0.tcm /home/james/memesvn/gomo2/scripts/../tests/common/crp0.s -oc /home/james/memesvn/gomo2/scripts/../tests/results/mast -nohtml -nostatus</command_line>
++		<command_line>mast /home/james/meme/scripts/../tests/meme/meme.crp0.tcm /home/james/meme/scripts/../tests/common/crp0.s -oc /home/james/meme/scripts/../tests/results/mast -nohtml -nostatus</command_line>
+ 		<max_correlation>0.60</max_correlation>
+ 		<remove_correlated value="n"/>
+ 		<strand_handling value="combine"/>
+@@ -74,7 +74,7 @@
+ 		<max_hit_pvalue>0.0001</max_hit_pvalue>
+ 		<max_weak_pvalue>0.0001</max_weak_pvalue>
+ 		<host>tlb-squirrel</host>
+-		<when>Mon Apr 12 09:38:55 2010</when>
++		<when>Tue Feb 28 17:27:34 2012</when>
+ 	</model>
+ 	<alphabet type="nucleotide" bg_source="preset">
+ 		<letter symbol="A" bg_value="0.274"/>
+@@ -82,13 +82,13 @@
+ 		<letter symbol="G" bg_value="0.225"/>
+ 		<letter symbol="T" bg_value="0.274"/>
+ 	</alphabet>
+-	<motifs source="/home/james/memesvn/gomo2/scripts/../tests/meme/meme.crp0.tcm" name="/home/james/memesvn/gomo2/scripts/../tests/meme/meme.crp0.tcm" last_mod_date="Mon Feb 15 12:10:16 2010">
++	<motifs source="/home/james/meme/scripts/../tests/meme/meme.crp0.tcm" name="/home/james/meme/scripts/../tests/meme/meme.crp0.tcm" last_mod_date="Tue Feb 28 17:06:39 2012">
+ 		<motif id="motif_1" num="1" name="1" width="19" best_f="TGTGAGCGACGTCACACTT" best_r="AAGTGTGACGTCGCTCACA"/>
+ 		<motif id="motif_2" num="2" name="2" width="8" best_f="CGGCGGGG" best_r="CCCCGCCG"/>
+ 		<correlation motif_a="motif_1" motif_b="motif_2" value="0.31"/>
+ 	</motifs>
+ 	<sequences>
+-		<database id="db_1" num="1" source="/home/james/memesvn/gomo2/scripts/../tests/common/crp0.s" name="/home/james/memesvn/gomo2/scripts/../tests/common/crp0.s" last_mod_date="Mon Feb 15 12:10:17 2010" seq_count="18" residue_count="1890" type="nucleotide"/>
++		<database id="db_1" num="1" source="/home/james/meme/scripts/../tests/common/crp0.s" name="/home/james/meme/scripts/../tests/common/crp0.s" last_mod_date="Wed Nov  9 18:52:42 2011" seq_count="18" residue_count="1890" type="nucleotide"/>
+ 		<sequence id="seq_1_8" db="db_1" num="8" name="ilv" comment="39" length="105">
+ 			<score strand="both" combined_pvalue="2.22e-05" evalue="0.0004"/>
+ 			<seg start="1">
+@@ -264,5 +264,5 @@
+ 			</seg>
+ 		</sequence>
+ 	</sequences>
+-	<runtime cycles="10000" seconds="0.010"/>
++	<runtime cycles="16001" seconds="0.016"/>
+ </mast>
+diff -r 81f90e1597b4 -r bd2d22b86425 tests/mast/mast.crp0.zoops
+--- a/tests/mast/mast.crp0.zoops	Wed Feb 22 14:46:22 2012 +1000
++++ b/tests/mast/mast.crp0.zoops	Tue Feb 28 17:57:54 2012 +1000
+@@ -62,9 +62,9 @@
+ <!ELEMENT runtime EMPTY>
+ <!ATTLIST runtime cycles CDATA #REQUIRED seconds CDATA #REQUIRED>
+ ]>
+-<mast version="4.3.2" release="Fri Apr 09 12:00:00 EST 2009">
++<mast version="4.8.1" release="Tue Feb 28 17:11:35 EST 2012">
+ 	<model>
+-		<command_line>mast /home/james/memesvn/gomo2/scripts/../tests/meme/meme.crp0.zoops /home/james/memesvn/gomo2/scripts/../tests/common/crp0.s -oc /home/james/memesvn/gomo2/scripts/../tests/results/mast -nohtml -nostatus</command_line>
++		<command_line>mast /home/james/meme/scripts/../tests/meme/meme.crp0.zoops /home/james/meme/scripts/../tests/common/crp0.s -oc /home/james/meme/scripts/../tests/results/mast -nohtml -nostatus</command_line>
+ 		<max_correlation>0.60</max_correlation>
+ 		<remove_correlated value="n"/>
+ 		<strand_handling value="combine"/>
+@@ -74,7 +74,7 @@
+ 		<max_hit_pvalue>0.0001</max_hit_pvalue>
+ 		<max_weak_pvalue>0.0001</max_weak_pvalue>
+ 		<host>tlb-squirrel</host>
+-		<when>Mon Apr 12 09:38:55 2010</when>
++		<when>Tue Feb 28 17:27:34 2012</when>
+ 	</model>
+ 	<alphabet type="nucleotide" bg_source="preset">
+ 		<letter symbol="A" bg_value="0.274"/>
+@@ -82,13 +82,13 @@
+ 		<letter symbol="G" bg_value="0.225"/>
+ 		<letter symbol="T" bg_value="0.274"/>
+ 	</alphabet>
+-	<motifs source="/home/james/memesvn/gomo2/scripts/../tests/meme/meme.crp0.zoops" name="/home/james/memesvn/gomo2/scripts/../tests/meme/meme.crp0.zoops" last_mod_date="Mon Feb 15 12:10:16 2010">
++	<motifs source="/home/james/meme/scripts/../tests/meme/meme.crp0.zoops" name="/home/james/meme/scripts/../tests/meme/meme.crp0.zoops" last_mod_date="Tue Feb 28 17:06:39 2012">
+ 		<motif id="motif_1" num="1" name="1" width="18" best_f="AATTGTGACGTCGATCAC" best_r="GTGATCGACGTCACAATT"/>
+ 		<motif id="motif_2" num="2" name="2" width="8" best_f="CGGCGGGG" best_r="CCCCGCCG"/>
+-		<correlation motif_a="motif_1" motif_b="motif_2" value="0.40"/>
++		<correlation motif_a="motif_1" motif_b="motif_2" value="0.41"/>
+ 	</motifs>
+ 	<sequences>
+-		<database id="db_1" num="1" source="/home/james/memesvn/gomo2/scripts/../tests/common/crp0.s" name="/home/james/memesvn/gomo2/scripts/../tests/common/crp0.s" last_mod_date="Mon Feb 15 12:10:17 2010" seq_count="18" residue_count="1890" type="nucleotide"/>
++		<database id="db_1" num="1" source="/home/james/meme/scripts/../tests/common/crp0.s" name="/home/james/meme/scripts/../tests/common/crp0.s" last_mod_date="Wed Nov  9 18:52:42 2011" seq_count="18" residue_count="1890" type="nucleotide"/>
+ 		<sequence id="seq_1_8" db="db_1" num="8" name="ilv" comment="39" length="105">
+ 			<score strand="both" combined_pvalue="6.47e-06" evalue="0.00012"/>
+ 			<seg start="1">
+@@ -260,5 +260,5 @@
+ 			</seg>
+ 		</sequence>
+ 	</sequences>
+-	<runtime cycles="0" seconds="0.000"/>
++	<runtime cycles="12000" seconds="0.012"/>
+ </mast>
+diff -r 81f90e1597b4 -r bd2d22b86425 tests/mast/mast.farntrans5.oops
+--- a/tests/mast/mast.farntrans5.oops	Wed Feb 22 14:46:22 2012 +1000
++++ b/tests/mast/mast.farntrans5.oops	Tue Feb 28 17:57:54 2012 +1000
+@@ -62,9 +62,9 @@
+ <!ELEMENT runtime EMPTY>
+ <!ATTLIST runtime cycles CDATA #REQUIRED seconds CDATA #REQUIRED>
+ ]>
+-<mast version="4.3.2" release="Fri Apr 09 12:00:00 EST 2009">
++<mast version="4.8.1" release="Tue Feb 28 17:11:35 EST 2012">
+ 	<model>
+-		<command_line>mast /home/james/memesvn/gomo2/scripts/../tests/meme/meme.farntrans5.oops /home/james/memesvn/gomo2/scripts/../tests/common/farntrans5.s -oc /home/james/memesvn/gomo2/scripts/../tests/results/mast -nohtml -nostatus</command_line>
++		<command_line>mast /home/james/meme/scripts/../tests/meme/meme.farntrans5.oops /home/james/meme/scripts/../tests/common/farntrans5.s -oc /home/james/meme/scripts/../tests/results/mast -nohtml -nostatus</command_line>
+ 		<max_correlation>0.60</max_correlation>
+ 		<remove_correlated value="n"/>
+ 		<strand_handling value="protein"/>
+@@ -74,7 +74,7 @@
+ 		<max_hit_pvalue>0.0001</max_hit_pvalue>
+ 		<max_weak_pvalue>0.0001</max_weak_pvalue>
+ 		<host>tlb-squirrel</host>
+-		<when>Fri Apr  9 17:08:52 2010</when>
++		<when>Tue Feb 28 17:27:34 2012</when>
+ 	</model>
+ 	<alphabet type="amino-acid" bg_source="preset">
+ 		<letter symbol="A" bg_value="0.073"/>
+@@ -98,13 +98,13 @@
+ 		<letter symbol="W" bg_value="0.013"/>
+ 		<letter symbol="Y" bg_value="0.033"/>
+ 	</alphabet>
+-	<motifs source="/home/james/memesvn/gomo2/scripts/../tests/meme/meme.farntrans5.oops" name="/home/james/memesvn/gomo2/scripts/../tests/meme/meme.farntrans5.oops" last_mod_date="Mon Feb 15 12:10:16 2010">
++	<motifs source="/home/james/meme/scripts/../tests/meme/meme.farntrans5.oops" name="/home/james/meme/scripts/../tests/meme/meme.farntrans5.oops" last_mod_date="Tue Feb 28 17:06:39 2012">
+ 		<motif id="motif_1" num="1" name="1" width="32" best_f="QQPEGGFNGRPNKLPDVCYSWWVLGSLPIIGR"/>
+ 		<motif id="motif_2" num="2" name="2" width="22" best_f="CQDEETGGFSDKPGNMVDFYHT"/>
+-		<correlation motif_a="motif_1" motif_b="motif_2" value="0.46"/>
++		<correlation motif_a="motif_1" motif_b="motif_2" value="0.45"/>
+ 	</motifs>
+ 	<sequences>
+-		<database id="db_1" num="1" source="/home/james/memesvn/gomo2/scripts/../tests/common/farntrans5.s" name="/home/james/memesvn/gomo2/scripts/../tests/common/farntrans5.s" last_mod_date="Mon Feb 15 12:10:17 2010" seq_count="5" residue_count="1900" type="amino-acid"/>
++		<database id="db_1" num="1" source="/home/james/meme/scripts/../tests/common/farntrans5.s" name="/home/james/meme/scripts/../tests/common/farntrans5.s" last_mod_date="Wed Nov  9 18:52:42 2011" seq_count="5" residue_count="1900" type="amino-acid"/>
+ 		<sequence id="seq_1_4" db="db_1" num="4" name="RATRABGERB" comment="Rat rab geranylgeranyl transferase beta-subunit" length="331">
+ 			<score strand="both" combined_pvalue="2.97e-49" evalue="1.5e-48"/>
+ 			<seg start="76">
+@@ -178,5 +178,5 @@
+ 			</seg>
+ 		</sequence>
+ 	</sequences>
+-	<runtime cycles="20000" seconds="0.020"/>
++	<runtime cycles="76004" seconds="0.076"/>
+ </mast>
+diff -r 81f90e1597b4 -r bd2d22b86425 tests/mast/mast.farntrans5.tcm
+--- a/tests/mast/mast.farntrans5.tcm	Wed Feb 22 14:46:22 2012 +1000
++++ b/tests/mast/mast.farntrans5.tcm	Tue Feb 28 17:57:54 2012 +1000
+@@ -62,9 +62,9 @@
+ <!ELEMENT runtime EMPTY>
+ <!ATTLIST runtime cycles CDATA #REQUIRED seconds CDATA #REQUIRED>
+ ]>
+-<mast version="4.3.2" release="Fri Apr 09 12:00:00 EST 2009">
++<mast version="4.8.1" release="Tue Feb 28 17:11:35 EST 2012">
+ 	<model>
+-		<command_line>mast /home/james/memesvn/gomo2/scripts/../tests/meme/meme.farntrans5.tcm /home/james/memesvn/gomo2/scripts/../tests/common/farntrans5.s -oc /home/james/memesvn/gomo2/scripts/../tests/results/mast -nohtml -nostatus</command_line>
++		<command_line>mast /home/james/meme/scripts/../tests/meme/meme.farntrans5.tcm /home/james/meme/scripts/../tests/common/farntrans5.s -oc /home/james/meme/scripts/../tests/results/mast -nohtml -nostatus</command_line>
+ 		<max_correlation>0.60</max_correlation>
+ 		<remove_correlated value="n"/>
+ 		<strand_handling value="protein"/>
+@@ -74,7 +74,7 @@
+ 		<max_hit_pvalue>0.0001</max_hit_pvalue>
+ 		<max_weak_pvalue>0.0001</max_weak_pvalue>
+ 		<host>tlb-squirrel</host>
+-		<when>Fri Apr  9 17:08:53 2010</when>
++		<when>Tue Feb 28 17:27:34 2012</when>
+ 	</model>
+ 	<alphabet type="amino-acid" bg_source="preset">
+ 		<letter symbol="A" bg_value="0.073"/>
+@@ -98,13 +98,13 @@
+ 		<letter symbol="W" bg_value="0.013"/>
+ 		<letter symbol="Y" bg_value="0.033"/>
+ 	</alphabet>
+-	<motifs source="/home/james/memesvn/gomo2/scripts/../tests/meme/meme.farntrans5.tcm" name="/home/james/memesvn/gomo2/scripts/../tests/meme/meme.farntrans5.tcm" last_mod_date="Mon Feb 15 12:10:16 2010">
++	<motifs source="/home/james/meme/scripts/../tests/meme/meme.farntrans5.tcm" name="/home/james/meme/scripts/../tests/meme/meme.farntrans5.tcm" last_mod_date="Tue Feb 28 17:06:39 2012">
+ 		<motif id="motif_1" num="1" name="1" width="30" best_f="GGFQGRPNKEVHTCYTYWALAALAILNKLH"/>
+ 		<motif id="motif_2" num="2" name="2" width="14" best_f="INREKHIQYIKSCQ"/>
+ 		<correlation motif_a="motif_1" motif_b="motif_2" value="0.27"/>
+ 	</motifs>
+ 	<sequences>
+-		<database id="db_1" num="1" source="/home/james/memesvn/gomo2/scripts/../tests/common/farntrans5.s" name="/home/james/memesvn/gomo2/scripts/../tests/common/farntrans5.s" last_mod_date="Mon Feb 15 12:10:17 2010" seq_count="5" residue_count="1900" type="amino-acid"/>
++		<database id="db_1" num="1" source="/home/james/meme/scripts/../tests/common/farntrans5.s" name="/home/james/meme/scripts/../tests/common/farntrans5.s" last_mod_date="Wed Nov  9 18:52:42 2011" seq_count="5" residue_count="1900" type="amino-acid"/>
+ 		<sequence id="seq_1_3" db="db_1" num="3" name="BET2_YEAST" comment="YPT1/SEC4 PROTEINS GERANYLGERANYLTRANSFERASE BETA SUBUNIT (EC 2." length="325">
+ 			<score strand="both" combined_pvalue="1.66e-26" evalue="8.3e-26"/>
+ 			<seg start="1">
+@@ -224,5 +224,5 @@
+ 			</seg>
+ 		</sequence>
+ 	</sequences>
+-	<runtime cycles="10000" seconds="0.010"/>
++	<runtime cycles="56003" seconds="0.056"/>
+ </mast>
+diff -r 81f90e1597b4 -r bd2d22b86425 tests/mast/mast.farntrans5.zoops
+--- a/tests/mast/mast.farntrans5.zoops	Wed Feb 22 14:46:22 2012 +1000
++++ b/tests/mast/mast.farntrans5.zoops	Tue Feb 28 17:57:54 2012 +1000
+@@ -62,9 +62,9 @@
+ <!ELEMENT runtime EMPTY>
+ <!ATTLIST runtime cycles CDATA #REQUIRED seconds CDATA #REQUIRED>
+ ]>
+-<mast version="4.3.2" release="Fri Apr 09 12:00:00 EST 2009">
++<mast version="4.8.1" release="Tue Feb 28 17:11:35 EST 2012">
+ 	<model>
+-		<command_line>mast /home/james/memesvn/gomo2/scripts/../tests/meme/meme.farntrans5.zoops /home/james/memesvn/gomo2/scripts/../tests/common/farntrans5.s -oc /home/james/memesvn/gomo2/scripts/../tests/results/mast -nohtml -nostatus</command_line>
++		<command_line>mast /home/james/meme/scripts/../tests/meme/meme.farntrans5.zoops /home/james/meme/scripts/../tests/common/farntrans5.s -oc /home/james/meme/scripts/../tests/results/mast -nohtml -nostatus</command_line>
+ 		<max_correlation>0.60</max_correlation>
+ 		<remove_correlated value="n"/>
+ 		<strand_handling value="protein"/>
+@@ -74,7 +74,7 @@
+ 		<max_hit_pvalue>0.0001</max_hit_pvalue>
+ 		<max_weak_pvalue>0.0001</max_weak_pvalue>
+ 		<host>tlb-squirrel</host>
+-		<when>Fri Apr  9 17:08:53 2010</when>
++		<when>Tue Feb 28 17:27:34 2012</when>
+ 	</model>
+ 	<alphabet type="amino-acid" bg_source="preset">
+ 		<letter symbol="A" bg_value="0.073"/>
+@@ -98,13 +98,13 @@
+ 		<letter symbol="W" bg_value="0.013"/>
+ 		<letter symbol="Y" bg_value="0.033"/>
+ 	</alphabet>
+-	<motifs source="/home/james/memesvn/gomo2/scripts/../tests/meme/meme.farntrans5.zoops" name="/home/james/memesvn/gomo2/scripts/../tests/meme/meme.farntrans5.zoops" last_mod_date="Mon Feb 15 12:10:16 2010">
++	<motifs source="/home/james/meme/scripts/../tests/meme/meme.farntrans5.zoops" name="/home/james/meme/scripts/../tests/meme/meme.farntrans5.zoops" last_mod_date="Tue Feb 28 17:06:39 2012">
+ 		<motif id="motif_1" num="1" name="1" width="32" best_f="QQPEGGFNGRPNKLPDVCYSWWVLGSLPIIGR"/>
+ 		<motif id="motif_2" num="2" name="2" width="50" best_f="GEVDTRFVYCALSVASLLNILTPELVEGAIEFVLRCQNFDGGFGCCPGAE"/>
+ 		<correlation motif_a="motif_1" motif_b="motif_2" value="0.30"/>
+ 	</motifs>
+ 	<sequences>
+-		<database id="db_1" num="1" source="/home/james/memesvn/gomo2/scripts/../tests/common/farntrans5.s" name="/home/james/memesvn/gomo2/scripts/../tests/common/farntrans5.s" last_mod_date="Mon Feb 15 12:10:17 2010" seq_count="5" residue_count="1900" type="amino-acid"/>
++		<database id="db_1" num="1" source="/home/james/meme/scripts/../tests/common/farntrans5.s" name="/home/james/meme/scripts/../tests/common/farntrans5.s" last_mod_date="Wed Nov  9 18:52:42 2011" seq_count="5" residue_count="1900" type="amino-acid"/>
+ 		<sequence id="seq_1_3" db="db_1" num="3" name="BET2_YEAST" comment="YPT1/SEC4 PROTEINS GERANYLGERANYLTRANSFERASE BETA SUBUNIT (EC 2." length="325">
+ 			<score strand="both" combined_pvalue="4.46e-71" evalue="2.2e-70"/>
+ 			<seg start="1">
+@@ -177,5 +177,5 @@
+ 			</seg>
+ 		</sequence>
+ 	</sequences>
+-	<runtime cycles="30000" seconds="0.030"/>
++	<runtime cycles="116007" seconds="0.116"/>
+ </mast>
+diff -r 81f90e1597b4 -r bd2d22b86425 tests/mast/mast.lipocalin.oops
+--- a/tests/mast/mast.lipocalin.oops	Wed Feb 22 14:46:22 2012 +1000
++++ b/tests/mast/mast.lipocalin.oops	Tue Feb 28 17:57:54 2012 +1000
+@@ -62,9 +62,9 @@
+ <!ELEMENT runtime EMPTY>
+ <!ATTLIST runtime cycles CDATA #REQUIRED seconds CDATA #REQUIRED>
+ ]>
+-<mast version="4.3.2" release="Fri Apr 09 12:00:00 EST 2009">
++<mast version="4.8.1" release="Tue Feb 28 17:11:35 EST 2012">
+ 	<model>
+-		<command_line>mast /home/james/memesvn/gomo2/scripts/../tests/meme/meme.lipocalin.oops /home/james/memesvn/gomo2/scripts/../tests/common/lipocalin.s -oc /home/james/memesvn/gomo2/scripts/../tests/results/mast -nohtml -nostatus</command_line>
++		<command_line>mast /home/james/meme/scripts/../tests/meme/meme.lipocalin.oops /home/james/meme/scripts/../tests/common/lipocalin.s -oc /home/james/meme/scripts/../tests/results/mast -nohtml -nostatus</command_line>
+ 		<max_correlation>0.60</max_correlation>
+ 		<remove_correlated value="n"/>
+ 		<strand_handling value="protein"/>
+@@ -74,7 +74,7 @@
+ 		<max_hit_pvalue>0.0001</max_hit_pvalue>
+ 		<max_weak_pvalue>0.0001</max_weak_pvalue>
+ 		<host>tlb-squirrel</host>
+-		<when>Fri Apr  9 17:08:53 2010</when>
++		<when>Tue Feb 28 17:27:35 2012</when>
+ 	</model>
+ 	<alphabet type="amino-acid" bg_source="preset">
+ 		<letter symbol="A" bg_value="0.073"/>
+@@ -98,13 +98,13 @@
+ 		<letter symbol="W" bg_value="0.013"/>
+ 		<letter symbol="Y" bg_value="0.033"/>
+ 	</alphabet>
+-	<motifs source="/home/james/memesvn/gomo2/scripts/../tests/meme/meme.lipocalin.oops" name="/home/james/memesvn/gomo2/scripts/../tests/meme/meme.lipocalin.oops" last_mod_date="Mon Feb 15 12:10:16 2010">
++	<motifs source="/home/james/meme/scripts/../tests/meme/meme.lipocalin.oops" name="/home/james/meme/scripts/../tests/meme/meme.lipocalin.oops" last_mod_date="Tue Feb 28 17:06:39 2012">
+ 		<motif id="motif_1" num="1" name="1" width="19" best_f="PMRNFDIQKFAGTWHEIAK"/>
+ 		<motif id="motif_2" num="2" name="2" width="20" best_f="NNVFWILDTDYKNYLIQYMC"/>
+-		<correlation motif_a="motif_1" motif_b="motif_2" value="0.24"/>
++		<correlation motif_a="motif_1" motif_b="motif_2" value="0.23"/>
+ 	</motifs>
+ 	<sequences>
+-		<database id="db_1" num="1" source="/home/james/memesvn/gomo2/scripts/../tests/common/lipocalin.s" name="/home/james/memesvn/gomo2/scripts/../tests/common/lipocalin.s" last_mod_date="Mon Feb 15 12:10:17 2010" seq_count="5" residue_count="903" type="amino-acid"/>
++		<database id="db_1" num="1" source="/home/james/meme/scripts/../tests/common/lipocalin.s" name="/home/james/meme/scripts/../tests/common/lipocalin.s" last_mod_date="Wed Nov  9 18:52:42 2011" seq_count="5" residue_count="903" type="amino-acid"/>
+ 		<sequence id="seq_1_1" db="db_1" num="1" name="ICYA_MANSE" comment="" length="189">
+ 			<score strand="both" combined_pvalue="1.02e-31" evalue="5.1e-31"/>
+ 			<seg start="1">
+@@ -181,5 +181,5 @@
+ 			</seg>
+ 		</sequence>
+ 	</sequences>
+-	<runtime cycles="10000" seconds="0.010"/>
++	<runtime cycles="56003" seconds="0.056"/>
+ </mast>
+diff -r 81f90e1597b4 -r bd2d22b86425 tests/mast/mast.lipocalin.tcm
+--- a/tests/mast/mast.lipocalin.tcm	Wed Feb 22 14:46:22 2012 +1000
++++ b/tests/mast/mast.lipocalin.tcm	Tue Feb 28 17:57:54 2012 +1000
+@@ -62,9 +62,9 @@
+ <!ELEMENT runtime EMPTY>
+ <!ATTLIST runtime cycles CDATA #REQUIRED seconds CDATA #REQUIRED>
+ ]>
+-<mast version="4.3.2" release="Fri Apr 09 12:00:00 EST 2009">
++<mast version="4.8.1" release="Tue Feb 28 17:11:35 EST 2012">
+ 	<model>
+-		<command_line>mast /home/james/memesvn/gomo2/scripts/../tests/meme/meme.lipocalin.tcm /home/james/memesvn/gomo2/scripts/../tests/common/lipocalin.s -oc /home/james/memesvn/gomo2/scripts/../tests/results/mast -nohtml -nostatus</command_line>
++		<command_line>mast /home/james/meme/scripts/../tests/meme/meme.lipocalin.tcm /home/james/meme/scripts/../tests/common/lipocalin.s -oc /home/james/meme/scripts/../tests/results/mast -nohtml -nostatus</command_line>
+ 		<max_correlation>0.60</max_correlation>
+ 		<remove_correlated value="n"/>
+ 		<strand_handling value="protein"/>
+@@ -74,7 +74,7 @@
+ 		<max_hit_pvalue>0.0001</max_hit_pvalue>
+ 		<max_weak_pvalue>0.0001</max_weak_pvalue>
+ 		<host>tlb-squirrel</host>
+-		<when>Fri Apr  9 17:08:53 2010</when>
++		<when>Tue Feb 28 17:27:35 2012</when>
+ 	</model>
+ 	<alphabet type="amino-acid" bg_source="preset">
+ 		<letter symbol="A" bg_value="0.073"/>
+@@ -98,13 +98,13 @@
+ 		<letter symbol="W" bg_value="0.013"/>
+ 		<letter symbol="Y" bg_value="0.033"/>
+ 	</alphabet>
+-	<motifs source="/home/james/memesvn/gomo2/scripts/../tests/meme/meme.lipocalin.tcm" name="/home/james/memesvn/gomo2/scripts/../tests/meme/meme.lipocalin.tcm" last_mod_date="Mon Feb 15 12:10:16 2010">
++	<motifs source="/home/james/meme/scripts/../tests/meme/meme.lipocalin.tcm" name="/home/james/meme/scripts/../tests/meme/meme.lipocalin.tcm" last_mod_date="Tue Feb 28 17:06:39 2012">
+ 		<motif id="motif_1" num="1" name="1" width="28" best_f="HDGRCPDVKPVDNFDWSRFAGTWWEIAK"/>
+ 		<motif id="motif_2" num="2" name="2" width="42" best_f="VFWVLATDNKNYIIGYNCDYDPDKKGHQDHVWILSRSKVLEG"/>
+ 		<correlation motif_a="motif_1" motif_b="motif_2" value="0.23"/>
+ 	</motifs>
+ 	<sequences>
+-		<database id="db_1" num="1" source="/home/james/memesvn/gomo2/scripts/../tests/common/lipocalin.s" name="/home/james/memesvn/gomo2/scripts/../tests/common/lipocalin.s" last_mod_date="Mon Feb 15 12:10:17 2010" seq_count="5" residue_count="903" type="amino-acid"/>
++		<database id="db_1" num="1" source="/home/james/meme/scripts/../tests/common/lipocalin.s" name="/home/james/meme/scripts/../tests/common/lipocalin.s" last_mod_date="Wed Nov  9 18:52:42 2011" seq_count="5" residue_count="903" type="amino-acid"/>
+ 		<sequence id="seq_1_3" db="db_1" num="3" name="BBP_PIEBR" comment="" length="173">
+ 			<score strand="both" combined_pvalue="1.06e-73" evalue="5.3e-73"/>
+ 			<seg start="1">
+@@ -157,5 +157,5 @@
+ 			<score strand="both" combined_pvalue="5.98e-02" evalue="0.3"/>
+ 		</sequence>
+ 	</sequences>
+-	<runtime cycles="20000" seconds="0.020"/>
++	<runtime cycles="92005" seconds="0.092"/>
+ </mast>
+diff -r 81f90e1597b4 -r bd2d22b86425 tests/mast/mast.lipocalin.zoops
+--- a/tests/mast/mast.lipocalin.zoops	Wed Feb 22 14:46:22 2012 +1000
++++ b/tests/mast/mast.lipocalin.zoops	Tue Feb 28 17:57:54 2012 +1000
+@@ -62,9 +62,9 @@
+ <!ELEMENT runtime EMPTY>
+ <!ATTLIST runtime cycles CDATA #REQUIRED seconds CDATA #REQUIRED>
+ ]>
+-<mast version="4.3.2" release="Fri Apr 09 12:00:00 EST 2009">
++<mast version="4.8.1" release="Tue Feb 28 17:11:35 EST 2012">
+ 	<model>
+-		<command_line>mast /home/james/memesvn/gomo2/scripts/../tests/meme/meme.lipocalin.zoops /home/james/memesvn/gomo2/scripts/../tests/common/lipocalin.s -oc /home/james/memesvn/gomo2/scripts/../tests/results/mast -nohtml -nostatus</command_line>
++		<command_line>mast /home/james/meme/scripts/../tests/meme/meme.lipocalin.zoops /home/james/meme/scripts/../tests/common/lipocalin.s -oc /home/james/meme/scripts/../tests/results/mast -nohtml -nostatus</command_line>
+ 		<max_correlation>0.60</max_correlation>
+ 		<remove_correlated value="n"/>
+ 		<strand_handling value="protein"/>
+@@ -74,7 +74,7 @@
+ 		<max_hit_pvalue>0.0001</max_hit_pvalue>
+ 		<max_weak_pvalue>0.0001</max_weak_pvalue>
+ 		<host>tlb-squirrel</host>
+-		<when>Fri Apr  9 17:08:53 2010</when>
++		<when>Tue Feb 28 17:27:35 2012</when>
+ 	</model>
+ 	<alphabet type="amino-acid" bg_source="preset">
+ 		<letter symbol="A" bg_value="0.073"/>
+@@ -98,13 +98,13 @@
+ 		<letter symbol="W" bg_value="0.013"/>
+ 		<letter symbol="Y" bg_value="0.033"/>
+ 	</alphabet>
+-	<motifs source="/home/james/memesvn/gomo2/scripts/../tests/meme/meme.lipocalin.zoops" name="/home/james/memesvn/gomo2/scripts/../tests/meme/meme.lipocalin.zoops" last_mod_date="Mon Feb 15 12:10:16 2010">
++	<motifs source="/home/james/meme/scripts/../tests/meme/meme.lipocalin.zoops" name="/home/james/meme/scripts/../tests/meme/meme.lipocalin.zoops" last_mod_date="Tue Feb 28 17:06:39 2012">
+ 		<motif id="motif_1" num="1" name="1" width="26" best_f="GACPAVRPMRNFDIQKFAGTWHEIAK"/>
+ 		<motif id="motif_2" num="2" name="2" width="20" best_f="NNVFWILDTDYKNYLIQYMC"/>
+ 		<correlation motif_a="motif_1" motif_b="motif_2" value="0.25"/>
+ 	</motifs>
+ 	<sequences>
+-		<database id="db_1" num="1" source="/home/james/memesvn/gomo2/scripts/../tests/common/lipocalin.s" name="/home/james/memesvn/gomo2/scripts/../tests/common/lipocalin.s" last_mod_date="Mon Feb 15 12:10:17 2010" seq_count="5" residue_count="903" type="amino-acid"/>
++		<database id="db_1" num="1" source="/home/james/meme/scripts/../tests/common/lipocalin.s" name="/home/james/meme/scripts/../tests/common/lipocalin.s" last_mod_date="Wed Nov  9 18:52:42 2011" seq_count="5" residue_count="903" type="amino-acid"/>
+ 		<sequence id="seq_1_1" db="db_1" num="1" name="ICYA_MANSE" comment="" length="189">
+ 			<score strand="both" combined_pvalue="3.19e-37" evalue="1.6e-36"/>
+ 			<seg start="1">
+@@ -181,5 +181,5 @@
+ 			</seg>
+ 		</sequence>
+ 	</sequences>
+-	<runtime cycles="0" seconds="0.000"/>
++	<runtime cycles="64004" seconds="0.064"/>
+ </mast>
+diff -r 81f90e1597b4 -r bd2d22b86425 tests/meme/meme.psp_test.zoops
+--- a/tests/meme/meme.psp_test.zoops	Wed Feb 22 14:46:22 2012 +1000
++++ b/tests/meme/meme.psp_test.zoops	Tue Feb 28 17:57:54 2012 +1000
+@@ -1,7 +1,7 @@
+ ********************************************************************************
+ MEME - Motif discovery tool
+ ********************************************************************************
+-MEME version 4.0.0 (Release date: 2008-07-12 05:23:09 +1000 (Sat, 12 Jul 2008))
++MEME version 4.8.1 (Release date: Tue Feb 28 17:11:35 EST 2012)
+ 
+ For further information on how to interpret these results or to get
+ a copy of the MEME software please access http://meme.nbcr.net.
+@@ -28,7 +28,7 @@
+ ********************************************************************************
+ TRAINING SET
+ ********************************************************************************
+-DATAFILE= psp_test.s
++DATAFILE= /home/james/meme/scripts/../tests/common/psp_test.s
+ ALPHABET= ACGT
+ Sequence name            Weight Length  Sequence name            Weight Length  
+ -------------            ------ ------  -------------            ------ ------  
+@@ -49,7 +49,7 @@
+ This information can also be useful in the event you wish to report a
+ problem with the MEME software.
+ 
+-command: meme psp_test.s -psp psp_test.psp -minsites 5 -dna -revcomp -minw 7 -maxw 12 -text 
++command: meme /home/james/meme/scripts/../tests/common/psp_test.s -psp /home/james/meme/scripts/../tests/common/psp_test.psp -minsites 5 -dna -revcomp -minw 7 -maxw 12 -nostatus -text 
+ 
+ model:  mod=         zoops    nmotifs=         1    evt=           inf
+ object function=  E-value of product of p-values
+@@ -210,7 +210,7 @@
+ 
+ 
+ 
+-Time 11.14 secs.
++Time 10.79 secs.
+ 
+ ********************************************************************************
+ 
+@@ -240,7 +240,8 @@
+ iYER045C-0                       2.54e-01  835
+ iYER072W                         3.01e-02  673_[-1(1.83e-05)]_161
+ iYFL005W                         3.33e-03  479_[+1(1.97e-06)]_365
+-iYGR035C                         4.66e-02  215_[+1(6.30e-05)]_33_[-1(3.29e-05)]_466
++iYGR035C                         4.66e-02  215_[+1(6.30e-05)]_33_\
++    [-1(3.29e-05)]_466
+ --------------------------------------------------------------------------------
+ 
+ ********************************************************************************
+@@ -250,6 +251,6 @@
+ Stopped because nmotifs = 1 reached.
+ ********************************************************************************
+ 
+-CPU: tlb-kamikaze-lt.imb.uq.edu.au
++CPU: tlb-squirrel
+ 
+ ********************************************************************************
+# HG changeset patch
+# User James Johnson <j.johnson@imb.uq.edu.au>
+# Date 1330380661 -36000
+# Node ID 10a2fb9e9f44718ea1f1b2cb7ee713dd426db6c0
+# Parent  81f90e1597b487144ea82df256c8b1eccd8a3923
+Added SpaMo to the tarred folders list.
+
+diff -r 81f90e1597b4 -r 10a2fb9e9f44 scripts/meme-chip.pl.in
+--- a/scripts/meme-chip.pl.in	Wed Feb 22 14:46:22 2012 +1000
++++ b/scripts/meme-chip.pl.in	Tue Feb 28 08:11:01 2012 +1000
+@@ -343,7 +343,7 @@
+       'seqs-discarded', 'seqs-centered_w_bg', 'index.html');
+   my @outdirs = ('meme_out', 'meme_tomtom_out', 'meme_mast_out', 
+       'meme_ama_out', 'dreme_out', 'dreme_tomtom_out', 'dreme_mast_out', 
+-      'dreme_ama_out', 'ame_out', 'centrimo_out');
++      'dreme_ama_out', 'ame_out', 'centrimo_out', 'meme_spamo_out', 'dreme_spamo_out');
+   foreach my $dir (@outdirs) {
+     push(@outfiles, $dir, $dir . '_stderr.txt');
+   }
+# HG changeset patch
+# User James Johnson <j.johnson@imb.uq.edu.au>
+# Date 1330906505 -36000
+# Node ID 3666f6ec7cc7073e96815fe1d1a2eca4b99f4018
+# Parent  02c88ea9dffad1f224d07b82c33b4d902c8307a6
+Fixed nmica2meme so it accepts input with only one motif. Made outer <motifset> tag optional.
+
+diff -r 02c88ea9dffa -r 3666f6ec7cc7 scripts/nmica2meme.pl.in
+--- a/scripts/nmica2meme.pl.in	Tue Feb 28 17:59:26 2012 +1000
++++ b/scripts/nmica2meme.pl.in	Mon Mar 05 10:15:05 2012 +1000
+@@ -40,6 +40,7 @@
+   -h                            print usage message
+ 
+   Read a nestedMICA (BioTiffin/XMS) matrix file and convert to MEME format.
++  Note only DNA motifs are supported.
+ 
+   Reads standard input.
+   Writes standard output
+@@ -72,42 +73,56 @@
+ pod2usage(1) if $help;
+ 
+ # Get the background model.
+-my %bg = &read_background_file(1, $bg_file); #DNA background file
++my $is_dna = 1;
++my %bg = &read_background_file($is_dna, $bg_file); #DNA background file
+ 
+ # Read the input file.
+-my $xml = new XML::Simple;
+-my $data = $xml->XMLin('-');		# read from standard input
++my $xml = new XML::Simple(KeepRoot => 1, ForceArray => ['motif', 'column'], 
++    KeyAttr => {'motif' => 'name', 'weight' => 'symbol'}, 
++    ContentKey => '-content');
++my $data;
++eval {
++  $data = $xml->XMLin('-');		# read from standard input
++};
++if ($@) {
++  pod2usage("Bad file on standard input.");
++}
++#print STDERR Dumper($data);
+ 
+-#print Dumper($data);
++$data = $data->{'motifset'} if (defined($data->{motifset}));
++my $motifs = $data->{motif};
++
+ 
+ my $n = @bases;
+ my $num_motifs = 0;
+-foreach my $motif_name (sort keys %{$data->{motif}}) {
+-  my $weight_matrix = $data->{motif}->{$motif_name}->{weightmatrix};
++my $num_skipped = 0;
++foreach my $motif_name (sort keys %{$motifs}) {
++  my $weight_matrix = $motifs->{$motif_name}->{weightmatrix};
++  if ($weight_matrix->{'alphabet'} ne 'DNA') {
++    print(STDERR "Skipped $motif_name as only DNA motifs are supported.\n");
++    $num_skipped++;
++    next;
++  }
+   my $w = $weight_matrix->{columns};
+-  my $alt = "";
++  my $cols = $weight_matrix->{column};
+   my $matrix = '';
+   # loop over columns of motif
+-  foreach my $column (@{$weight_matrix->{column}}) {
+-   # get the frequencies for this column
+-    my %freqs;
+-    foreach my $entry (@{$column->{weight}}) {
+-      $freqs{$entry->{symbol}} = $entry->{content};
+-    }
++  foreach my $col (@{$cols}) {
++    # get the frequencies for this column
++    my $freqs = $col->{weight};
+     # create an ascii matrix
+-    for (my $i=0; $i<$n; $i++) {
+-      my $base = $bases[$i];
+-      $matrix .= " " . $freqs{$base}; 
++    for (my $i = 0; $i < scalar(@bases); $i++) {
++      $matrix .= " " . $freqs->{$bases[$i]}; 
+     }
+     $matrix .= "\n";
+   }
+   # convert and print ascii matrix
+-  my ($motif, $errors) = matrix_to_intern(\%bg, $matrix, 'row', $num_seqs, $pseudo_total, id => $motif_name, alt => $alt, url => '');
++  my ($motif, $errors) = matrix_to_intern(\%bg, $matrix, 'row', $num_seqs, 
++      $pseudo_total, id => $motif_name);
+   print intern_to_meme($motif, $print_logodds, 1, !($num_motifs++)) if $motif;
+   print(STDERR join("\n", @{$errors}), "\n") if @{$errors};
+ }
+ 
+-my $num_skipped = 0;
+ 
+ print(STDERR "Converted $num_motifs motifs.\n");
+ print(STDERR "Skipped $num_skipped motifs.\n");
+# HG changeset patch
+# User James Johnson <j.johnson@imb.uq.edu.au>
+# Date 1330908206 -36000
+# Node ID 97e881234622e65f9befe38e6140e3b55ee76eb1
+# Parent  52d97c9bc3e27fb530ae27a0b0c185857f8a0c32
+Fixed bug in Glam2 CGI - was reading value for max aligned columns as the value for initial aligned columns.
+
+diff -r 52d97c9bc3e2 -r 97e881234622 website/cgi-bin/glam2.pl
+--- a/website/cgi-bin/glam2.pl	Mon Mar 05 10:17:22 2012 +1000
++++ b/website/cgi-bin/glam2.pl	Mon Mar 05 10:43:26 2012 +1000
+@@ -284,7 +284,7 @@
+       ') must be &le; to the maximum number of aligned columns (' . 
+       $d{MAX_COLS} .').');
+   }
+-  $d{INITIAL_COLS} = $utils->param_int($q, '-b', 'initial number of aligned columns', 
++  $d{INITIAL_COLS} = $utils->param_int($q, '-w', 'initial number of aligned columns', 
+     (defined($d{MIN_COLS}) ? $d{MIN_COLS} : 2), 
+     (defined($d{MAX_COLS}) ? $d{MAX_COLS} : 300));
+   $d{RUNS} = $utils->param_int($q, '-r', 'number of alignment replicates', 1, 100);
+# HG changeset patch
+# User James Johnson <j.johnson@imb.uq.edu.au>
+# Date 1330991023 -36000
+# Node ID 59ed92581a3475cd31fb7ca2e26f42957d983bc4
+# Parent  97e881234622e65f9befe38e6140e3b55ee76eb1
+Fixed a bug in meme_webservice where psp-gen was getting the wrong keyword for the protein alphabet. It expected prot but was getting protein.
+
+diff -r 97e881234622 -r 59ed92581a34 scripts/meme_webservice.pl.in
+--- a/scripts/meme_webservice.pl.in	Mon Mar 05 10:43:26 2012 +1000
++++ b/scripts/meme_webservice.pl.in	Tue Mar 06 09:43:43 2012 +1000
+@@ -189,6 +189,7 @@
+ 
+ # Run PSPGen
+ if (defined($negfile)) { 
++  my $psp_alph = ($alphabet eq 'protein' ? 'prot' : 'dna');
+   # use the minw and maxw settings for MEME for finding the PSP but
+   # trim to the allowed range for PSPs
+   # the actual width set by the PSP finder is that with the highest
+@@ -196,9 +197,9 @@
+   # codes (but score any sites containing them as zero)
+   my $psp_minw = $minw < $MINPSPW ? $MINPSPW : $minw;
+   my $psp_maxw = $maxw > $MAXPSPW ? $MAXPSPW : $maxw;
+-  my @pspgen_args = ('-pos', $sequences, '-neg', $negfile, '-alpha', $alphabet, 
++  my @pspgen_args = ('-pos', $sequences, '-neg', $negfile, '-alpha', $psp_alph, 
+     '-minw', $psp_minw, '-maxw', $psp_maxw, '-arbitraryOK');
+-  push(@pspgen_args, '-maxrange', '-triples') if ($alphabet eq 'prot');
++  push(@pspgen_args, '-maxrange', '-triples') if ($psp_alph eq 'prot');
+   run_prog(
+     PROG => 'psp-gen', 
+     ARGS => \@pspgen_args,
