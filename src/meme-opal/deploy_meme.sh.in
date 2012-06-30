@@ -1,0 +1,43 @@
+#!/bin/bash
+
+VER=@VER@
+ANT=/opt/rocks/bin/ant
+OPALXML=/opt/opal/build.xml
+OPALCONFIG=/opt/opal/deployed
+
+echo ant -f $OPALXML deploy -DserviceName=FIMO_${VER} -DappConfig=$OPALCONFIG/fimo_@VER@.xml
+     ant -f $OPALXML deploy -DserviceName=FIMO_${VER} -DappConfig=$OPALCONFIG/fimo_@VER@.xml
+
+echo ant -f $OPALXML deploy -DserviceName=MEME_${VER} -DappConfig=$OPALCONFIG/meme_@VER@.xml
+     ant -f $OPALXML deploy -DserviceName=MEME_${VER} -DappConfig=$OPALCONFIG/meme_@VER@.xml
+
+echo ant -f $OPALXML deploy -DserviceName=MAST_${VER} -DappConfig=$OPALCONFIG/mast_@VER@.xml
+     ant -f $OPALXML deploy -DserviceName=MAST_${VER} -DappConfig=$OPALCONFIG/mast_@VER@.xml
+
+echo ant -f $OPALXML deploy -DserviceName=GLAM2_${VER} -DappConfig=$OPALCONFIG/glam2_@VER@.xml
+     ant -f $OPALXML deploy -DserviceName=GLAM2_${VER} -DappConfig=$OPALCONFIG/glam2_@VER@.xml
+
+echo ant -f $OPALXML deploy -DserviceName=GLAM2SCAN_${VER} -DappConfig=$OPALCONFIG/glam2scan_@VER@.xml
+     ant -f $OPALXML deploy -DserviceName=GLAM2SCAN_${VER} -DappConfig=$OPALCONFIG/glam2scan_@VER@.xml
+
+echo ant -f $OPALXML deploy -DserviceName=GOMO_${VER} -DappConfig=$OPALCONFIG/gomo_@VER@.xml
+     ant -f $OPALXML deploy -DserviceName=GOMO_${VER} -DappConfig=$OPALCONFIG/gomo_@VER@.xml
+
+echo ant -f $OPALXML deploy -DserviceName=MCAST_${VER} -DappConfig=$OPALCONFIG/mcast_@VER@.xml
+     ant -f $OPALXML deploy -DserviceName=MCAST_${VER} -DappConfig=$OPALCONFIG/mcast_@VER@.xml
+
+echo ant -f $OPALXML deploy -DserviceName=TOMTOM_${VER} -DappConfig=$OPALCONFIG/tomtom_@VER@.xml
+     ant -f $OPALXML deploy -DserviceName=TOMTOM_${VER} -DappConfig=$OPALCONFIG/tomtom_@VER@.xml
+
+echo ant -f $OPALXML deploy -DserviceName=SPAMO_${VER} -DappConfig=$OPALCONFIG/spamo_@VER@.xml
+     ant -f $OPALXML deploy -DserviceName=SPAMO_${VER} -DappConfig=$OPALCONFIG/spamo_@VER@.xml
+
+echo ant -f $OPALXML deploy -DserviceName=MEMECHIP_${VER} -DappConfig=$OPALCONFIG/meme-chip_@VER@.xml
+     ant -f $OPALXML deploy -DserviceName=MEMECHIP_${VER} -DappConfig=$OPALCONFIG/meme-chip_@VER@.xml
+
+echo ant -f $OPALXML deploy -DserviceName=DREME_${VER} -DappConfig=$OPALCONFIG/dreme_@VER@.xml
+     ant -f $OPALXML deploy -DserviceName=DREME_${VER} -DappConfig=$OPALCONFIG/dreme_@VER@.xml
+
+echo ant -f $OPALXML deploy -DserviceName=CENTRIMO_${VER} -DappConfig=$OPALCONFIG/centrimo_@VER@.xml
+     ant -f $OPALXML deploy -DserviceName=CENTRIMO_${VER} -DappConfig=$OPALCONFIG/centrimo_@VER@.xml
+

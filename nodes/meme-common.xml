@@ -1,0 +1,27 @@
+<?xml version="1.0" standalone="no"?>
+
+<kickstart>
+
+
+	<description>
+	MEME
+	</description>
+
+	<copyright>
+	Copyright (c) 2000 - 2011 The Regents of the University of California.
+	All rights reserved. Rocks(r) v6.0 www.rocksclusters.org
+	
+	</copyright>
+
+	<changelog>
+	$Log: meme-common.xml,v $
+	Revision 1.1  2012/06/30 02:11:10  nadya
+	initial
+	
+	</changelog>
+
+	<package>meme</package>
+	<package>rocks-meme</package>
+
+
+</kickstart>
