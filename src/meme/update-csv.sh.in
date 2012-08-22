@@ -1,0 +1,34 @@
+#!/bin/bash
+
+BASE=/opt/@NAME@_@VERSION@
+BIN=$BASE/bin
+ETC=$BASE/etc
+LOG=$ETC/update-csv.log
+export RSATWS=$BASE/lib/perl/RSATWS
+
+touch $LOG
+echo `date` " - start update" >> $LOG
+
+Bacteria=db_genbank_bacteria.csv
+Fungi=db_genbank_fungi.csv
+Ensambl=db_ensembl.csv
+EnsamblAlb=db_ensembl_abinitio.csv
+Upstream=db_upstream.csv
+Fasta=fasta_db.csv
+
+$BIN/get_db_csv -db GENBANK -class Bacteria > $ETC/$Bacteria 2>>$LOG
+echo "  created $ETC/$Bacteria" >> $LOG
+$BIN/get_db_csv -db GENBANK -class Fungi > $ETC/$Fungi 2>>$LOG
+echo "  created $ETC/$Fungi" >> $LOG 2>>$LOG
+$BIN/get_db_csv -db ENSEMBL > $ETC/$Ensambl 2>>$LOG
+echo "  created csv file $ETC/$Ensambl" >> $LOG 2>>$LOG
+$BIN/get_db_csv -db ENSEMBL_ABINITIO > $ETC/$EnsamblAlb 2>>$LOG
+echo "  created $ETC/$EnsamblAlb" >> $LOG 2>>$LOG
+$BIN/get_db_csv -db UPSTREAM > $ETC/$Upstream 2>>$LOG
+echo "  created $ETC/$Upstream" >> $LOG 2>>$LOG
+
+(cd $ETC; cat db_general.csv db_other_genomes.csv $Ensembl $EnsemblAlb $Fungi $Bacteria $Upstream > $Fasta)
+
+echo "  created file $ETC/$Fasta" >> $LOG 2>>$LOG
+echo `date` " - end update" >> $LOG 
+
