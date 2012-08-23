@@ -1,0 +1,4 @@
+NAME    	= meme-db
+TARBALL_POSTFIX	= tgz
+GOMO          = gomo_databases
+MOTIF         = motif_databases
