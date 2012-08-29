@@ -2,11 +2,19 @@
 
 # number of days to keep old jobs scratch directories
 DAYS=7
-DIR=/share/opal/meme
 
+# tomtom temp files
+DIR=/share/opal/meme
 files=`find $DIR  -type d -mtime +$DAYS -mindepth 1 -print`
 for i in $files;
 do
         rm -rf $i
 done
 
+# CGI temp files
+DIR=/var/tmp
+files=`find $DIR  -type f -mtime +$DAYS -mindepth 1 -print`
+for i in $files;
+do
+        rm -rf $i
+done
