@@ -1,22 +1,12 @@
 #!/bin/bash
 
-# number of days to keep old scratch directories
-n=4
+# number of days to keep old jobs scratch directories
+DAYS=7
+DIR=/share/opal/meme
 
-# pdb2pqr jobs dir 
-jobsDir=/var/tmp/pdb2pqr/tmp
-echo "Removing pdb2pqr jobs directories older then $n days from $jobsDir"
-
-cd $jobsDir/
-Dirs=`find . -maxdepth 1 -type d -mtime +$n -name '1*' -print`
-for i in $Dirs; do
-  rm -rf $i
+files=`find $DIR  -type d -mtime +$DAYS -mindepth 1 -print`
+for i in $files;
+do
+        rm -rf $i
 done
-
-Files=`find . -maxdepth 1 -type f -mtime +$n -name '*.html' -print`
-for i in $Files; do
-  rm -rf $i
-done
-
-echo "Done"
 
