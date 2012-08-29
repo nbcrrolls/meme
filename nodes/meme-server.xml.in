@@ -15,6 +15,9 @@
 
 	<changelog>
 	$Log: meme-server.xml.in,v $
+	Revision 1.2  2012/08/29 22:01:25  nadya
+	correct path, add NFS mount location for meme db and jobs output
+	
 	Revision 1.1  2012/06/30 02:11:10  nadya
 	initial
 	
@@ -23,12 +26,42 @@
 	<package>roll-meme-usersguide</package>
 
 <post>
+
+<!-- make links for web CGI access -->
 if [ -e /var/www/html/meme ] ; then
    rm -rf /var/www/html/meme
 fi
-
 ln -s /opt/meme_MEMEVER/web /var/www/html/meme_MEMEVER
 ln -s /opt/meme_MEMEVER/web /var/www/html/meme
+
+<!-- make a shortcut for installed meme version -->
+if [ -e /opt/meme ] ; then
+   rm -rf /opt/meme
+fi
+ln -s /opt/meme_MEMEVER /opt/meme
+
+<!-- make NFS-shared directory for meme db -->
+if [ ! -d /export/meme ]; then
+    mkdir -m0755 -p /export/meme
+fi
+
+mkdir -p /export/meme/db
+<file name="/etc/auto.share" mode="append">
+meme &Kickstart_PrivateHostname;:/export/&amp;
+</file>
+
+/etc/init.d/autofs restart
+
+<!-- make NFS-shared directory for meme jobs temp output -->
+mkdir -p /export/meme/output
+chmod 777 /export/meme/output
+rm -rf /opt/meme_MEMEVER/web/output
+ln -s /export/meme/output /opt/meme_MEMEVER/web/output
+ 
+mkdir -p /export/meme/user-files
+chmod 777 /export/meme/user-files
+rm -rf /opt/meme_MEMEVER/web/user-files
+ln -s /export/meme/user-files /opt/meme_MEMEVER/web/user-files
 
 </post>
 
