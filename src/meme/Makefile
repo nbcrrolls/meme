@@ -1,9 +1,12 @@
-# $Id: Makefile,v 1.2 2012/08/22 23:53:30 nadya Exp $
+# $Id: Makefile,v 1.3 2012/08/29 01:50:29 nadya Exp $
 #
 # @Copyright@
 # @Copyright@
 #
 # $Log: Makefile,v $
+# Revision 1.3  2012/08/29 01:50:29  nadya
+# clean RSATWS
+#
 # Revision 1.2  2012/08/22 23:53:30  nadya
 # add RSATWS, update-csv.sh
 #
@@ -83,4 +86,4 @@ install::
 clean::
 	rm -rf version.mk
 	rm -rf update-csv.sh update-csv-bootstrap.sh
-	rm -rf $(NAME)_$(VERSION)
+	rm -rf $(NAME)_$(VERSION) $(RSATWS)
