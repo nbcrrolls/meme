@@ -1,0 +1,8 @@
+#!/bin/bash
+
+UPDATE=/opt/meme_MEMEVER/bin/update-csv.sh
+
+if [ -x $UPDATE ] ; then
+    $UPDATE
+fi
+
