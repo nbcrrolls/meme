@@ -1,8 +1,20 @@
 #!/bin/bash
 
-UPDATE=/opt/meme_MEMEVER/bin/update-csv.sh
+# update cvs files
+UPDATE_CSV=/opt/meme_MEMEVER/bin/update-csv.sh
 
-if [ -x $UPDATE ] ; then
-    $UPDATE
+if [ -x $UPDATE_CSV ] ; then
+    $UPDATE_CSV
+fi
+
+# update db per cvs files
+UPDATEDB=/opt/meme_MEMEVER/bin/update_db
+LOG=/tmp/meme-update-db.log
+OPTS="-upstream -noclobber"
+
+date > $LOG
+
+if [ -x $UPDATEDB ] ; then
+    $UPDATEDB $OPTS >> $LOG
 fi
 
