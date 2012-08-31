@@ -1,0 +1,35 @@
+<chapter id="requirements" xreflabel="Requirements">
+<title>Requirements</title>
+
+<para>
+The MEME roll is for use with Rocks &document-version;.
+</para>
+
+<para>
+You must install the following rolls before installing the MEME roll:
+</para>
+
+<itemizedlist>
+<listitem><para>
+Perl roll (provides perl 5.14)
+</para></listitem>
+<listitem><para>
+Opal roll (is required only for web submission).
+</para></listitem>
+</itemizedlist>
+
+<para>
+This roll provides:
+</para>
+
+<itemizedlist>
+<listitem><para> meme 4.8.1 </para></listitem>
+<listitem><para> perl(SOAP::WSDL) </para></listitem>
+<listitem><para> perl(Class::Std) </para></listitem>
+<listitem><para> perl(Class::Std::Fast) </para></listitem>
+<listitem><para> perl(Class::Std::Fast::Storable) </para></listitem>
+<listitem><para> perl(Date) </para></listitem>
+<listitem><para> perl(Time::Zone) </para></listitem>
+</itemizedlist>
+
+</chapter>

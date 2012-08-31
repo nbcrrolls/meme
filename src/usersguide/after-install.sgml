@@ -1,0 +1,72 @@
+<chapter id="afterinstall" xreflabel="AfterInstall">
+<title>After installing  MEME Roll </title>
+
+<simplesect>
+<title>What is installed on a frontend</title>
+<itemizedlist>
+<listitem> <para>/opt/meme_4.8.1 (meme suit) </para></listitem>
+<listitem> <para>/opt/meme -> /opt/meme_4.8.1 </para></listitem>
+<listitem> <para>/opt/meme_4.8.1/bin/update-csv.sh (script to update db csv files) </para></listitem>
+<listitem> <para>/var/www/html/meme -> /opt/meme_4.8.1/web (link to cgi web interface)</para></listitem>
+<listitem> <para>/var/www/html/meme_4.8.1 -> /opt/meme_4.8.1/web (link to cgi web interface)</para></listitem>
+<listitem> <para>/var/www/html/roll-documentation/meme (roll docs) </para></listitem>
+<listitem> <para>/etc/cron.daily/meme-job-cleanup (cron job to clean old job dirs) </para></listitem>
+<listitem> <para>/etc/cron.monthly/meme-update-db (cron job to update db) </para></listitem>
+<listitem> <para>/share/meme/db (gomo, motif and fasta dbs) </para></listitem>
+<listitem> <para>/share/meme/output (for tomtom jobs temp files) </para></listitem>
+<listitem> <para>/share/meme/user-files (for CGI jtemp files) </para></listitem>
+<listitem> <para>/opt/meme_4.8.1/web/output --> /share/meme/output </para></listitem>
+<listitem> <para>/opt/meme_4.8.1/web/user-files --> /share/meme/user-files </para></listitem>
+<listitem> <para>/opt/perl/lib/site_perl/5.14.2/Class/Std </para></listitem>
+<listitem> <para>/opt/perl/lib/site_perl/5.14.2/Class/Std/Fast </para></listitem>
+<listitem> <para>/opt/perl/lib/site_perl/5.14.2/SOAP/WSDL </para></listitem>
+<listitem> <para>/opt/perl/lib/site_perl/5.14.2/Date </para></listitem>
+<listitem> <para>/opt/perl/lib/site_perl/5.14.2/Time </para></listitem>
+</itemizedlist>
+</simplesect>
+
+<simplesect>
+<title>What is installed on compute nodes</title>
+<itemizedlist>
+<listitem> <para>/opt/meme_4.8.1 (meme suit) </para></listitem>
+<listitem> <para>/opt/meme -> /opt/meme_4.8.1 </para></listitem>
+</itemizedlist>
+</simplesect>
+
+<simplesect>
+<title>Databases update </title>
+<para>
+A directory /share/meme/db holds 3 different databases: gomo, motif, and fasta. 
+The first 2 are installed with the roll. The fasta databases need to be uploaded 
+after installing the roll. 
+The fasta databases can be very large (~600-800GB) and depending on your filesystem layout a
+separate partition for fasta databases need to be created. For example, your /state/partition1
+is only 100Gb and we expect fasta databases be around 600Gb. There is another filesystem /data
+with 2Tb of space. 
+</para>
+<itemizedlist>
+<listitem> <para>mkdir -p /data/meme/fasta_databases</para></listitem>
+<listitem> <para>rm -rf /share/meme/db/fasta_database</para></listitem>
+<listitem> <para>ln -s /data/meme/fasta_databases /share/meme/db/fasta_database</para></listitem>
+</itemizedlist>
+
+<para>
+The databases need to be available on all compute nodes, so /data/meme/fasta_databases 
+need to be available (automount) on all compute nodes. Please update automount maps accordingly
+</para>
+<para>
+Monthly cron job /etc/cron.monthly/meme-update-db takes care of updating csv files and
+uploading the fasta databases.  After installing the roll run this command directly to
+upload the databases first time:
+</para>
+<itemizedlist>
+<listitem> <para>/etc/cron.monthly/meme-update-db </para></listitem>
+</itemizedlist>
+<para>
+It can take time to download all the sequence databases, and the connections to some sites from which 
+files are downloaded may be not always available. Check the output of the script (/tmp/meme-update-db.log) for error messages. 
+If there are errors, the command to install the fasta sequence databases will need to be repeated.
+</para>
+</simplesect>
+
+</chapter>

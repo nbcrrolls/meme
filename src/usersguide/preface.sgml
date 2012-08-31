@@ -1,0 +1,17 @@
+<preface id="preface" xreflabel="preface">
+<title>Preface</title>
+
+<para>
+Please visit the <ulink url="http://meme.nbcr.net/">official MEME site</ulink> to learn more about it.
+</para>
+
+<para>
+The meme roll will install meme v.4.8.1 distribution in /opt/meme_4.8.1 and configure
+web service for it. 
+</para>
+<para>
+Required databases will need to be uploaded after the roll install. 
+Roll provides needed scripts for the database upload. 
+</para>
+
+</preface>

@@ -1,0 +1,33 @@
+<chapter id="help" xreflabel="Using MEME">
+<title>Using MEME</title>
+
+<simplesect>
+<title>Using MEME roll</title>
+
+<para>
+Simply run MEME on your server:
+</para>
+
+<itemizedlist>
+<listitem><para>directly as a <ulink url="http://rollhost/opal2/dashboard?command=serviceList">web service</ulink> 
+</para></listitem>
+<listitem><para>through <ulink url="http://rollhost/meme">CGI interface</ulink> 
+</para></listitem>
+</itemizedlist>
+
+</simplesect>
+
+<simplesect> 
+<title>MEME alternate servers</title>
+<para>
+The MEME web server can be found at the following mirrors:
+</para>
+<itemizedlist>
+<listitem><para>
+<ulink url="http://meme.qfab.org/">The Queensland Facility for Advanced Bioinformatics </ulink>
+</para></listitem>
+</itemizedlist>
+
+</simplesect>
+
+</chapter>
