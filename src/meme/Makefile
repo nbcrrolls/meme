@@ -1,9 +1,12 @@
-# $Id: Makefile,v 1.3 2012/08/29 01:50:29 nadya Exp $
+# $Id: Makefile,v 1.4 2012/08/31 01:24:06 nadya Exp $
 #
 # @Copyright@
 # @Copyright@
 #
 # $Log: Makefile,v $
+# Revision 1.4  2012/08/31 01:24:06  nadya
+# move databases to /export
+#
 # Revision 1.3  2012/08/29 01:50:29  nadya
 # clean RSATWS
 #
@@ -82,6 +85,9 @@ install::
 	$(INSTALL) -m755  update-csv.sh  $(ROOT)/$(PKGROOT)/bin
 	mkdir -p $(ROOT)/$(PKGROOT)/lib/perl
 	cp -r $(RSATWS) $(ROOT)/$(PKGROOT)/lib/perl
+	ln -s /share/meme/db/motif_databases $(ROOT)/$(PKGROOT)/db
+	ln -s /share/meme/db/gomo_databases $(ROOT)/$(PKGROOT)/db
+	ln -s /share/meme/db/fasta_databases $(ROOT)/$(PKGROOT)/db
 
 clean::
 	rm -rf version.mk

@@ -1,9 +1,12 @@
-# $Id: Makefile,v 1.1 2012/08/23 00:01:29 nadya Exp $
+# $Id: Makefile,v 1.2 2012/08/31 01:23:03 nadya Exp $
 #
 # @Copyright@
 # @Copyright@
 #
 # $Log: Makefile,v $
+# Revision 1.2  2012/08/31 01:23:03  nadya
+# move databases to /export
+#
 # Revision 1.1  2012/08/23 00:01:29  nadya
 # initial
 #
@@ -11,7 +14,7 @@
 # initial
 #
 
-PKGROOT = /opt/$(NAME)_$(VERSION)
+PKGROOT = /export/meme/
 
 REDHAT.ROOT = $(CURDIR)/../../
 
