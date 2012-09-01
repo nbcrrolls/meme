@@ -10,12 +10,14 @@ include Rules.mk
 SEDSPEC += \
         -e 's%MEMEVER%$(MEMEVER)%g' 
 
+version.mk:
+	cat version.mk.in ../version.mk > version.mk
 
 meme-update-db:  meme-update-db.in
 	$(SED) $(SEDSPEC) $^ > $@
 	chmod 755 $@
 
-build: meme-update-db
+build: version.mk meme-update-db
 
 install::
 	mkdir -p $(ROOT)/etc/cron.daily 
@@ -26,3 +28,4 @@ install::
 clean::
 	rm -f $(NAME).spec.in
 	rm -rf meme-update-db
+	rm -rf version.mk 
