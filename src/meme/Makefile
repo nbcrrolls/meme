@@ -1,9 +1,12 @@
-# $Id: Makefile,v 1.5 2012/09/01 02:01:15 nadya Exp $
+# $Id: Makefile,v 1.6 2012/09/01 04:13:15 nadya Exp $
 #
 # @Copyright@
 # @Copyright@
 #
 # $Log: Makefile,v $
+# Revision 1.6  2012/09/01 04:13:15  nadya
+# use version in one place
+#
 # Revision 1.5  2012/09/01 02:01:15  nadya
 # remove original ant deployment during make install.
 #
@@ -20,7 +23,7 @@
 # initial
 #
 
-PKGROOT = /opt/$(NAME)_$(VERSION)
+PKGROOT = /opt/$(NAME)_$(MEMEVER)
 
 REDHAT.ROOT = $(CURDIR)/../../
 
@@ -32,7 +35,7 @@ version.mk:
 	cat version.mk.in ../version.mk > version.mk
 
 SEDSPEC += \
-        -e 's%@VERSION@%$(VERSION)%g' \
+        -e 's%@MEMEVER@%$(MEMEVER)%g' \
         -e 's%@NAME@%$(NAME)%g' 
 
 SEDSPECBOOTSTRAP += \
@@ -49,18 +52,18 @@ update-csv-bootstrap.sh: update-csv.sh
 	chmod 755 $@
 
 build: version.mk update-csv.sh update-csv-bootstrap.sh
-	gunzip -c $(NAME)_$(VERSION).$(TARBALL_POSTFIX) | $(TAR) -xf -
+	gunzip -c $(NAME)_$(MEMEVER).$(TARBALL_POSTFIX) | $(TAR) -xf -
 	cd patch-files && find . -type f | grep -v CVS | cpio -pduv ..
 
 	(							      \
-		cd $(NAME)_$(VERSION);				      \
+		cd $(NAME)_$(MEMEVER);				      \
 		patch -p0 -i ../patches/patch_4.8.1_1;                \
 		patch -p1 -i ../patches/patch_4.8.1_2;                \
 		patch -p1 -i ../patches/patch_4.8.1_3;                \
 		patch -p0 -i ../patches/patch_4.8.1_4;                \
 	)
 	( 							      \
-		cd $(NAME)_$(VERSION);				      \
+		cd $(NAME)_$(MEMEVER);				      \
 		export CATALINA_HOME=/opt/tomcat;		      \
 		./configure --prefix=$(PKGROOT)                       \
 			--enable-opt                                  \
@@ -70,7 +73,7 @@ build: version.mk update-csv.sh update-csv-bootstrap.sh
 			--with-python=/opt/python/bin/python2.7       \
 			--with-perl=/opt/perl/bin/perl                \
 			--with-contact=meme@nbcr.net                  \
-			--with-url=http://rollhost/meme_$(VERSION)    \
+			--with-url=http://rollhost/meme_$(MEMEVER)    \
 			--enable-web=http://rollhost/opal2/services   \
 			--enable-webservice=/opt/opal/build.xml ;     \
 		$(MAKE);					      \
@@ -83,7 +86,7 @@ build: version.mk update-csv.sh update-csv-bootstrap.sh
 install::
 	mkdir -p $(ROOT)/$(PKGROOT)
 	(							\
-		cd $(NAME)_$(VERSION);				\
+		cd $(NAME)_$(MEMEVER);				\
 		$(MAKE) prefix=$(ROOT)/$(PKGROOT) install;\
 	)
 	mkdir -p $(ROOT)/$(PKGROOT)/bin
@@ -97,4 +100,4 @@ install::
 clean::
 	rm -rf version.mk
 	rm -rf update-csv.sh update-csv-bootstrap.sh
-	rm -rf $(NAME)_$(VERSION) $(RSATWS)
+	rm -rf $(NAME)_$(MEMEVER) $(RSATWS)
