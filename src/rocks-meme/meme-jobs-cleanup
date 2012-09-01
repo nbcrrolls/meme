@@ -4,17 +4,21 @@
 DAYS=7
 
 # tomtom temp files
-DIR=/share/opal/meme
-files=`find $DIR  -type d -mtime +$DAYS -mindepth 1 -print`
-for i in $files;
-do
+DIR=/share/meme/output
+if [ -d $DIR ] ; then
+    files=`find $DIR  -mindepth 1  -type d -mtime +$DAYS -print`
+    for i in $files;
+    do
         rm -rf $i
-done
+    done
+fi
 
 # CGI temp files
-DIR=/var/tmp
-files=`find $DIR  -type f -mtime +$DAYS -mindepth 1 -print`
-for i in $files;
-do
+if [ -d /var/tmp ] ; then
+    DIR=/var/tmp
+    files=`find $DIR  -type f -mtime +$DAYS -name 'CGItemp*'  -print`
+    for i in $files;
+    do
         rm -rf $i
-done
+    done
+fi
