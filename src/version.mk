@@ -1,3 +1,3 @@
-VERSION = 4.8.1
+MEMEVER = 4.8.1
 RELEASE = 0
 
