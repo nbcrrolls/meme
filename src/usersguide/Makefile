@@ -1,7 +1,7 @@
 # @Copyright@
 # @Copyright@
 
-PKGROOT = /var/www/html/roll-documentation/meme/$(VERSION)
+PKGROOT = /var/www/html/roll-documentation/meme/$(ROCKS_VERSION)
 
 REDHAT.ROOT = $(PWD)/../../
 -include $(ROCKSROOT)/etc/Rules.mk
@@ -11,23 +11,30 @@ SEDSPEC += \
 	-e 's%@PUBDATE@%$(PUBDATE)%g' \
 	-e 's%@YEAR@%$(YEAR)%g' \
 	-e 's%@NAME@%$(NAME)%g' \
-	-e 's%@VERSION@%$(VERSION)%g' \
+	-e 's%@MEMEVER@%$(MEMEVER)%g' \
 	-e 's%@ROCKS_VERSION@%$(ROCKS_VERSION)%g' 
+
+version.mk:
+	cat version.mk.in ../version.mk > version.mk
 
 default: $(NAME).spec 
 
-html: predoc
+html: version.mk after-install.sgml preface.sgml requirements.sgml predoc 
 	jw --backend html --dsl $(PWD)/rocks.dsl#html index.sgml
 
-pdf: predoc
+pdf: version.mk after-install.sgml preface.sgml requirements.sgml predoc 
 	jw --backend pdf --dsl $(PWD)/rocks.dsl#print index.sgml
 
+after-install.sgml: after-install.sgml.in
+	$(SED) $(SEDSPEC) $^ > $@
 
-pretar::
-	mkdir -p images
+preface.sgml: preface.sgml.in
+	$(SED) $(SEDSPEC) $^ > $@
+
+requirements.sgml: requirements.sgml.in
+	$(SED) $(SEDSPEC) $^ > $@
 
 build: html pdf
-	mkdir -p images
 
 install:: build
 	mkdir -p $(ROOT)/$(PKGROOT)/images
@@ -42,4 +49,5 @@ install:: build
 clean::
 	rm -f index.pdf
 	rm -rf *.html
-	rm -rf images
+	rm -rf images/*.png version.mk
+	rm -rf after-install.sgml preface.sgml requirements.sgml

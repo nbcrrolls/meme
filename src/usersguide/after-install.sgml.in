@@ -4,19 +4,19 @@
 <simplesect>
 <title>What is installed on a frontend</title>
 <itemizedlist>
-<listitem> <para>/opt/meme_4.8.1 (meme suit) </para></listitem>
-<listitem> <para>/opt/meme -> /opt/meme_4.8.1 </para></listitem>
-<listitem> <para>/opt/meme_4.8.1/bin/update-csv.sh (script to update db csv files) </para></listitem>
-<listitem> <para>/var/www/html/meme -> /opt/meme_4.8.1/web (link to cgi web interface)</para></listitem>
-<listitem> <para>/var/www/html/meme_4.8.1 -> /opt/meme_4.8.1/web (link to cgi web interface)</para></listitem>
+<listitem> <para>/opt/meme_@MEMEVER@ (meme suit) </para></listitem>
+<listitem> <para>/opt/meme -> /opt/meme_@MEMEVER@ </para></listitem>
+<listitem> <para>/opt/meme_@MEMEVER@/bin/update-csv.sh (script to update db csv files) </para></listitem>
+<listitem> <para>/var/www/html/meme -> /opt/meme_@MEMEVER@/web (link to cgi web interface)</para></listitem>
+<listitem> <para>/var/www/html/meme_@MEMEVER@ -> /opt/meme_@MEMEVER@/web (link to cgi web interface)</para></listitem>
 <listitem> <para>/var/www/html/roll-documentation/meme (roll docs) </para></listitem>
 <listitem> <para>/etc/cron.daily/meme-job-cleanup (cron job to clean old job dirs) </para></listitem>
 <listitem> <para>/etc/cron.monthly/meme-update-db (cron job to update db) </para></listitem>
 <listitem> <para>/share/meme/db (gomo, motif and fasta dbs) </para></listitem>
 <listitem> <para>/share/meme/output (for tomtom jobs temp files) </para></listitem>
 <listitem> <para>/share/meme/user-files (for CGI jtemp files) </para></listitem>
-<listitem> <para>/opt/meme_4.8.1/web/output --> /share/meme/output </para></listitem>
-<listitem> <para>/opt/meme_4.8.1/web/user-files --> /share/meme/user-files </para></listitem>
+<listitem> <para>/opt/meme_@MEMEVER@/web/output --> /share/meme/output </para></listitem>
+<listitem> <para>/opt/meme_@MEMEVER@/web/user-files --> /share/meme/user-files </para></listitem>
 <listitem> <para>/opt/perl/lib/site_perl/5.14.2/Class/Std </para></listitem>
 <listitem> <para>/opt/perl/lib/site_perl/5.14.2/Class/Std/Fast </para></listitem>
 <listitem> <para>/opt/perl/lib/site_perl/5.14.2/SOAP/WSDL </para></listitem>
@@ -28,8 +28,8 @@
 <simplesect>
 <title>What is installed on compute nodes</title>
 <itemizedlist>
-<listitem> <para>/opt/meme_4.8.1 (meme suit) </para></listitem>
-<listitem> <para>/opt/meme -> /opt/meme_4.8.1 </para></listitem>
+<listitem> <para>/opt/meme_@MEMEVER@ (meme suit) </para></listitem>
+<listitem> <para>/opt/meme -> /opt/meme_@MEMEVER@ </para></listitem>
 </itemizedlist>
 </simplesect>
 

@@ -23,7 +23,7 @@ This roll provides:
 </para>
 
 <itemizedlist>
-<listitem><para> meme 4.8.1 </para></listitem>
+<listitem><para> meme @MEMEVER@ </para></listitem>
 <listitem><para> perl(SOAP::WSDL) </para></listitem>
 <listitem><para> perl(Class::Std) </para></listitem>
 <listitem><para> perl(Class::Std::Fast) </para></listitem>

@@ -1,6 +1,5 @@
 <!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook V3.1//EN" [
 	<!ENTITY % entities SYSTEM "entities.sgml">
-	<!ENTITY after-install SYSTEM "after-install.sgml">
 	%entities;
 ]>
 
@@ -24,7 +23,7 @@
 &source-preface;
 &source-requirements;
 &source-installing;
-&after-install;
+&source-after-install;
 &source-using;
 &source-contact;
 
