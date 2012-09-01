@@ -1,9 +1,12 @@
-# $Id: Makefile,v 1.1 2012/06/30 02:18:14 nadya Exp $
+# $Id: Makefile,v 1.2 2012/09/01 04:11:23 nadya Exp $
 #
 # @Copyright@
 # @Copyright@
 #
 # $Log: Makefile,v $
+# Revision 1.2  2012/09/01 04:11:23  nadya
+# user version in one place
+#
 # Revision 1.1  2012/06/30 02:18:14  nadya
 # initial
 #
@@ -14,7 +17,7 @@ REDHAT.ROOT = $(CURDIR)/../../
 include Rules.mk
 
 SEDSPEC += \
-        -e 's%@VER@%$(VERSION)%g' 
+        -e 's%@MEMEVER@%$(MEMEVER)%g' 
 
 version.mk:
 	cat version.mk.in ../version.mk > version.mk
