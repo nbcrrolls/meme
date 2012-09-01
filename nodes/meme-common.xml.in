@@ -15,6 +15,9 @@
 
 	<changelog>
 	$Log: meme-common.xml.in,v $
+	Revision 1.2  2012/09/01 04:16:18  nadya
+	add link to the latest install version (can have 1-2 meme installs)
+	
 	Revision 1.1  2012/08/30 18:31:26  nadya
 	update packages, use version
 	
@@ -26,6 +29,8 @@
 	<package>meme</package>
 
 <post>
+ln -s /opt/meme_MEMEVER /opt/meme
+
 # fix the hostname
 tempname="rollhost"
 SERVER_NAME="&opal_public_fqdn;"
