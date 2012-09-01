@@ -1,9 +1,12 @@
-# $Id: Makefile,v 1.4 2012/08/31 01:24:06 nadya Exp $
+# $Id: Makefile,v 1.5 2012/09/01 02:01:15 nadya Exp $
 #
 # @Copyright@
 # @Copyright@
 #
 # $Log: Makefile,v $
+# Revision 1.5  2012/09/01 02:01:15  nadya
+# remove original ant deployment during make install.
+#
 # Revision 1.4  2012/08/31 01:24:06  nadya
 # move databases to /export
 #
@@ -47,6 +50,8 @@ update-csv-bootstrap.sh: update-csv.sh
 
 build: version.mk update-csv.sh update-csv-bootstrap.sh
 	gunzip -c $(NAME)_$(VERSION).$(TARBALL_POSTFIX) | $(TAR) -xf -
+	cd patch-files && find . -type f | grep -v CVS | cpio -pduv ..
+
 	(							      \
 		cd $(NAME)_$(VERSION);				      \
 		patch -p0 -i ../patches/patch_4.8.1_1;                \
