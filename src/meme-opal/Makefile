@@ -1,9 +1,12 @@
-# $Id: Makefile,v 1.2 2012/09/01 04:11:23 nadya Exp $
+# $Id: Makefile,v 1.3 2012/10/05 18:30:52 nadya Exp $
 #
 # @Copyright@
 # @Copyright@
 #
 # $Log: Makefile,v $
+# Revision 1.3  2012/10/05 18:30:52  nadya
+# use version in deployment script name: 2 meme verisons need to coexist on a server
+#
 # Revision 1.2  2012/09/01 04:11:23  nadya
 # user version in one place
 #
@@ -22,14 +25,14 @@ SEDSPEC += \
 version.mk:
 	cat version.mk.in ../version.mk > version.mk
 
-deploy_meme.sh: deploy_meme.sh.in
+deploy_meme_$(MEMEVER).sh: deploy_meme.sh.in
 	$(SED) $(SEDSPEC) $^ > $@
 
-build: deploy_meme.sh
+build: deploy_meme_$(MEMEVER).sh
 	
 install::
 	mkdir -p $(ROOT)/$(PKGROOT)
-	$(INSTALL)  -m 0750  deploy_meme.sh  $(ROOT)/$(PKGROOT)
+	$(INSTALL)  -m 0750  deploy_meme_$(MEMEVER).sh  $(ROOT)/$(PKGROOT)
 
 clean::
-	rm -rf version.mk deploy_meme.sh
+	rm -rf version.mk deploy_meme_$(MEMEVER).sh
