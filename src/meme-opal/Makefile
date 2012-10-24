@@ -1,9 +1,12 @@
-# $Id: Makefile,v 1.3 2012/10/05 18:30:52 nadya Exp $
+# $Id: Makefile,v 1.4 2012/10/24 23:05:39 nadya Exp $
 #
 # @Copyright@
 # @Copyright@
 #
 # $Log: Makefile,v $
+# Revision 1.4  2012/10/24 23:05:39  nadya
+# fix permissions
+#
 # Revision 1.3  2012/10/05 18:30:52  nadya
 # use version in deployment script name: 2 meme verisons need to coexist on a server
 #
@@ -32,7 +35,7 @@ build: deploy_meme_$(MEMEVER).sh
 	
 install::
 	mkdir -p $(ROOT)/$(PKGROOT)
-	$(INSTALL)  -m 0750  deploy_meme_$(MEMEVER).sh  $(ROOT)/$(PKGROOT)
+	$(INSTALL)  -m 0755  deploy_meme_$(MEMEVER).sh  $(ROOT)/$(PKGROOT)
 
 clean::
 	rm -rf version.mk deploy_meme_$(MEMEVER).sh
