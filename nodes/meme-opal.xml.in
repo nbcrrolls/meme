@@ -14,17 +14,20 @@
 	</copyright>
 
 	<changelog>
-	$Log: meme-opal.xml,v $
-	Revision 1.1  2012/06/30 02:11:10  nadya
-	initial
+	$Log: meme-opal.xml.in,v $
+	Revision 1.1  2012/10/24 01:33:54  nadya
+	use version in deploy script
+	
 	
 	</changelog>
 
 	<package>meme-opal</package>
 
 <post>
-if [ -f /opt/opal/deployed/deploy_meme.sh ]; then
-    /opt/opal/deployed/deploy_meme.sh
+LOGFILE=/tmp/meme-deploy.log
+
+if [ -f /opt/opal/deployed/deploy_meme_MEMEVER.sh ]; then
+    /bin/su tomcat -c "/opt/opal/deployed/deploy_meme_MEMEVER.sh" &gt; $LOGFILE  2&gt;&amp;1
 fi
 
 </post>
