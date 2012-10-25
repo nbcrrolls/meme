@@ -1,14 +1,14 @@
 #!/bin/bash
 
 # update cvs files
-UPDATE_CSV=/opt/meme_MEMEVER/bin/update-csv.sh
+UPDATE_CSV=/opt/meme_@MEMEVER@/bin/update-csv.sh
 
 if [ -x $UPDATE_CSV ] ; then
     $UPDATE_CSV
 fi
 
 # update db per cvs files
-UPDATEDB=/opt/meme_MEMEVER/bin/update_db
+UPDATEDB=/opt/meme_@MEMEVER@/bin/update_db
 LOG=/tmp/meme-update-db.log
 OPTS="-upstream -noclobber"
 
