@@ -1,6 +1,6 @@
 #!/bin/bash
 
-BASE=/opt/@NAME@_@VERSION@
+BASE=/opt/@NAME@_@MEMEVER@
 BIN=$BASE/bin
 ETC=$BASE/etc
 LOG=$ETC/update-csv.log
@@ -27,8 +27,18 @@ echo "  created $ETC/$EnsamblAlb" >> $LOG 2>>$LOG
 $BIN/get_db_csv -db UPSTREAM > $ETC/$Upstream 2>>$LOG
 echo "  created $ETC/$Upstream" >> $LOG 2>>$LOG
 
-(cd $ETC; cat db_general.csv db_other_genomes.csv $Ensembl $EnsemblAlb $Fungi $Bacteria $Upstream > $Fasta)
+cd $ETC
 
+# csv file
+cat db_general.csv db_other_genomes.csv $Ensembl $EnsemblAlb $Fungi $Bacteria $Upstream > $Fasta
 echo "  created file $ETC/$Fasta" >> $LOG 2>>$LOG
+
+# index file
+if [ -f $ETC/fasta_db.index.new ] ; then
+    /bin/rm -f $ETC/fasta_db.index.new
+fi
+/opt/perl/bin/perl -I $BASE/lib/perl/ -MCatList -e 'CatList::index_catlist_csv("fasta_db.csv", "fasta_db.index.new")'  >> $LOG 2>>$LOG
+/bin/mv -f $ETC/fasta_db.index.new  $ETC/fasta_db.index
+
 echo `date` " - end update" >> $LOG 
 
