@@ -1,9 +1,12 @@
-# $Id: Makefile,v 1.6 2012/09/01 04:13:15 nadya Exp $
+# $Id: Makefile,v 1.7 2012/10/25 21:55:25 nadya Exp $
 #
 # @Copyright@
 # @Copyright@
 #
 # $Log: Makefile,v $
+# Revision 1.7  2012/10/25 21:55:25  nadya
+# move creattion nfs-mounted dirs for user output from nodes files,
+#
 # Revision 1.6  2012/09/01 04:13:15  nadya
 # use version in one place
 #
@@ -24,6 +27,8 @@
 #
 
 PKGROOT = /opt/$(NAME)_$(MEMEVER)
+PKGROOT_OUT = output-$(MEMEVER)
+PKGROOT_USER = user-files-$(MEMEVER)
 
 REDHAT.ROOT = $(CURDIR)/../../
 
@@ -96,6 +101,16 @@ install::
 	ln -s /share/meme/db/motif_databases $(ROOT)/$(PKGROOT)/db
 	ln -s /share/meme/db/gomo_databases $(ROOT)/$(PKGROOT)/db
 	ln -s /share/meme/db/fasta_databases $(ROOT)/$(PKGROOT)/db
+
+	mkdir -p $(ROOT)/state/partition1/meme/$(PKGROOT_OUT)
+	chmod 777 $(ROOT)/state/partition1/meme/$(PKGROOT_OUT)
+	rm -rf $(ROOT)/$(PKGROOT)/web/output
+	ln -s /share/meme/$(PKGROOT_OUT) $(ROOT)/$(PKGROOT)/web/output
+
+	mkdir -p $(ROOT)/state/partition1/meme/$(PKGROOT_USER)
+	chmod 777 $(ROOT)/state/partition1/meme/$(PKGROOT_USER)
+	rm -rf $(ROOT)/$(PKGROOT)/web/user-files
+	ln -s /share/meme/$(PKGROOT_USER) $(ROOT)/$(PKGROOT)/web/user-files
 
 clean::
 	rm -rf version.mk
