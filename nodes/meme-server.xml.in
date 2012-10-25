@@ -15,6 +15,10 @@
 
 	<changelog>
 	$Log: meme-server.xml.in,v $
+	Revision 1.5  2012/10/25 20:34:56  nadya
+	move nfs-mounted iuseroutpu dirs creation to src/meme
+	update autofs maps on all compute nodes
+	
 	Revision 1.4  2012/10/24 01:33:33  nadya
 	add HTML::Template, needed by web site server part
 	
@@ -36,7 +40,6 @@
 	<package>opt-perl-Class-Std-Fast</package>
 	<package>opt-perl-SOAP-WSDL</package>
 	<package>opt-perl-TimeDate</package>
-	<package>opt-perl-HTML-Template</package>
 
 <post>
 
@@ -47,34 +50,15 @@ fi
 ln -s /opt/meme_MEMEVER/web /var/www/html/meme_MEMEVER
 ln -s /opt/meme_MEMEVER/web /var/www/html/meme
 
-<!-- make a shortcut for installed meme version -->
-if [ -e /opt/meme ] ; then
-   rm -rf /opt/meme
-fi
-ln -s /opt/meme_MEMEVER /opt/meme
 
-<!-- make NFS-shared directory for meme db -->
-if [ ! -d /export/meme ]; then
-    mkdir -m0755 -p /export/meme
-fi
-
-mkdir -p /export/meme/db
+<!-- mounting NFS-shared directory for meme db and output -->
 <file name="/etc/auto.share" mode="append">
 meme &Kickstart_PrivateHostname;:/export/&amp;
 </file>
 
 /etc/init.d/autofs restart
-
-<!-- make NFS-shared directory for meme jobs temp output -->
-mkdir -p /export/meme/output
-chmod 777 /export/meme/output
-rm -rf /opt/meme_MEMEVER/web/output
-ln -s /export/meme/output /opt/meme_MEMEVER/web/output
- 
-mkdir -p /export/meme/user-files
-chmod 777 /export/meme/user-files
-rm -rf /opt/meme_MEMEVER/web/user-files
-ln -s /export/meme/user-files /opt/meme_MEMEVER/web/user-files
+/opt/rocks/bin/rocks sync users
+/opt/rocks/bin/rocks run host compute "service autofs restart"
 
 </post>
 
