@@ -15,6 +15,9 @@
 
 	<changelog>
 	$Log: meme-common.xml.in,v $
+	Revision 1.3  2012/10/25 20:32:26  nadya
+	add HTML-Template, fix regex, ch for pre-existing link
+	
 	Revision 1.2  2012/09/01 04:16:18  nadya
 	add link to the latest install version (can have 1-2 meme installs)
 	
@@ -27,11 +30,16 @@
 	</changelog>
 
 	<package>meme</package>
+	<package>opt-perl-HTML-Template</package>
 
 <post>
+<!-- make a shortcut for installed meme version -->
+if [ -e /opt/meme ] ; then
+   rm -rf /opt/meme
+fi
 ln -s /opt/meme_MEMEVER /opt/meme
 
-# fix the hostname
+# fix hostname
 tempname="rollhost"
 SERVER_NAME="&opal_public_fqdn;"
 if [ "$SERVER_NAME" == "" ] ; then
@@ -39,8 +47,7 @@ if [ "$SERVER_NAME" == "" ] ; then
     SERVER_NAME="&Kickstart_PublicHostname;"
 fi
 
-change_list=`grep -r -l $tempname /opt/meme_MEMEVER/[!db]*`
-
+change_list=`grep -r -l $tempname /opt/meme_MEMEVER/[!d]*`
 for i in $change_list; do \
     sed -i "s/$tempname/$SERVER_NAME/g" $i; \
 done
