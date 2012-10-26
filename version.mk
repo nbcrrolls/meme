@@ -1,5 +1,6 @@
 ROLLNAME	= meme
-RELEASE		= 0
+MEMEVER         = 4.8.1
+RELEASE		= 0_$(MEMEVER)
 COLOR		= blue
 
 REDHAT.ROOT	= $(CURDIR)
