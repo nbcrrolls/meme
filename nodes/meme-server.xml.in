@@ -15,6 +15,9 @@
 
 	<changelog>
 	$Log: meme-server.xml.in,v $
+	Revision 1.6  2012/10/26 22:50:51  nadya
+	restart httpd after adding apache redirect
+	
 	Revision 1.5  2012/10/25 20:34:56  nadya
 	move nfs-mounted iuseroutpu dirs creation to src/meme
 	update autofs maps on all compute nodes
@@ -55,6 +58,8 @@ ln -s /opt/meme_MEMEVER/web /var/www/html/meme
 <file name="/etc/auto.share" mode="append">
 meme &Kickstart_PrivateHostname;:/export/&amp;
 </file>
+
+/etc/init.d/httpd restart
 
 /etc/init.d/autofs restart
 /opt/rocks/bin/rocks sync users
