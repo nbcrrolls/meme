@@ -28,6 +28,10 @@ install::
 	$(INSTALL) -m755 meme-jobs-cleanup $(ROOT)/etc/cron.daily/meme-jobs-cleanup-$(MEMEVER)
 	mkdir -p $(ROOT)/etc/cron.monthly 
 	$(INSTALL) -m755 meme-update-db $(ROOT)/etc/cron.monthly
+	mkdir -p $(ROOT)/var/www/html/downloads
+	$(INSTALL) -m644 index.html $(ROOT)/var/www/html/downloads
+	mkdir -p $(ROOT)/etc/httpd/conf.d
+	$(INSTALL) -m644 meme.conf $(ROOT)/etc/httpd/conf.d
 
 clean::
 	rm -f $(NAME).spec.in

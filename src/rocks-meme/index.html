@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="refresh" content="10;url=ftp://ftp.ebi.edu.au/pub/software/MEME/">
+    <title>Redirecting to MEME Suite Downloads</title>
+    <script>
+      var count = 10;
+      function countdown() {
+        document.getElementById("count").innerHTML = count--;
+        if (count > 0) setTimeout(countdown, 1000);
+      }
+    </script>
+  </head>
+  <body onload="countdown()">
+    <p>Please note updated MEME Suite Downloads URL <a href="ftp://ftp.ebi.edu.au/pub/software/MEME/">ftp://ftp.ebi.edu.a
+u/pub/software/MEME/</a>
+    <p>Redirecting to <a href="ftp://ftp.ebi.edu.au/pub/software/MEME/">MEME Suite Downloads</a>
+    in <span id="count">10</span> seconds.</p>
+  </body>
+</html>
+
