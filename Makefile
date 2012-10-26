@@ -1,10 +1,13 @@
 #
-# $Id: Makefile,v 1.2 2012/09/01 04:18:02 nadya Exp $
+# $Id: Makefile,v 1.3 2012/10/26 22:54:13 nadya Exp $
 #
 # @Copyright@
 # @Copyright@
 #
 # $Log: Makefile,v $
+# Revision 1.3  2012/10/26 22:54:13  nadya
+# can't include file from subdirectories, add needed locally
+#
 # Revision 1.2  2012/09/01 04:18:02  nadya
 # use verson in one place, update cleaning
 #
@@ -15,7 +18,6 @@
 
 -include $(ROLLSROOT)/etc/Rolls.mk
 include Rolls.mk
-include $(CURDIR)/src/version.mk
 
 default: 
 	for i in `ls nodes/*.xml.in`; do \
