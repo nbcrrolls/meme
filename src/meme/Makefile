@@ -1,9 +1,12 @@
-# $Id: Makefile,v 1.7 2012/10/25 21:55:25 nadya Exp $
+# $Id: Makefile,v 1.8 2012/10/30 21:15:52 nadya Exp $
 #
 # @Copyright@
 # @Copyright@
 #
 # $Log: Makefile,v $
+# Revision 1.8  2012/10/30 21:15:52  nadya
+# fix paths used by update script during compile
+#
 # Revision 1.7  2012/10/25 21:55:25  nadya
 # move creattion nfs-mounted dirs for user output from nodes files,
 #
@@ -44,9 +47,10 @@ SEDSPEC += \
         -e 's%@NAME@%$(NAME)%g' 
 
 SEDSPECBOOTSTRAP += \
-        -e 's/=\/opt\//=.\//' \
+        -e 's/=\/opt\//=`pwd`\//' \
         -e 's/BASE\/bin/BASE\/scripts/' \
-        -e 's/$$BASE\/RSATWS/`pwd`\/RSATWS/'
+        -e 's/LIB=$$BASE\/lib\/perl/LIB=$$BASE\/scripts/' \
+        -e 's/$$BASE\/lib\/perl\/RSATWS/`pwd`\/RSATWS/'
 
 update-csv.sh: update-csv.sh.in
 	$(SED) $(SEDSPEC) $^ > $@
@@ -62,10 +66,7 @@ build: version.mk update-csv.sh update-csv-bootstrap.sh
 
 	(							      \
 		cd $(NAME)_$(MEMEVER);				      \
-		patch -p0 -i ../patches/patch_4.8.1_1;                \
-		patch -p1 -i ../patches/patch_4.8.1_2;                \
-		patch -p1 -i ../patches/patch_4.8.1_3;                \
-		patch -p0 -i ../patches/patch_4.8.1_4;                \
+		../patch-$(MEMEVER);                                  \
 	)
 	( 							      \
 		cd $(NAME)_$(MEMEVER);				      \
@@ -84,8 +85,8 @@ build: version.mk update-csv.sh update-csv-bootstrap.sh
 		$(MAKE);					      \
 		$(MAKE) test;					      \
 	)
-	./update-csv-bootstrap.sh
 	gunzip -c $(RSATWS).$(TARBALL_POSTFIX) | $(TAR) -xf -
+	./update-csv-bootstrap.sh
 
 	
 install::
