@@ -1,10 +1,13 @@
 #
-# $Id: Makefile,v 1.3 2012/10/26 22:54:13 nadya Exp $
+# $Id: Makefile,v 1.4 2012/10/30 21:22:32 nadya Exp $
 #
 # @Copyright@
 # @Copyright@
 #
 # $Log: Makefile,v $
+# Revision 1.4  2012/10/30 21:22:32  nadya
+# don't clean nodes/
+#
 # Revision 1.3  2012/10/26 22:54:13  nadya
 # can't include file from subdirectories, add needed locally
 #
@@ -29,5 +32,4 @@ default:
 
 clean::
 	rm -rf extramods
-	rm -rf nodes/meme-common.xml  nodes/meme-server.xml
 
