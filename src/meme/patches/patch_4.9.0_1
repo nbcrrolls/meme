@@ -1,0 +1,252 @@
+diff -r 02aa25f920a7 -r caa80f3ff934 etc/centrimo_template.html
+--- a/etc/centrimo_template.html	Fri Oct 05 09:45:00 2012 +1000
++++ b/etc/centrimo_template.html	Fri Oct 05 00:26:25 2012 -0700
+@@ -371,7 +371,7 @@
+             <label for="windo">Window:</label>
+             <input type="number" style="min-width:40px;" id="windo" 
+             onkeypress="num_keys(event)"
+-            onchange="recreate_table=true; make_MP_graph(); recreate_table=false" value="20" size="2" min="1">
++            onchange="recreate_table=true; make_MP_graph(); recreate_table=false" value="20" size="2" step="1" min="1">
+           </div>
+           <div>
+             <label for="legend">Legend:</label>
+@@ -507,7 +507,7 @@
+               onclick="toggle_filter(this, 'filter_top')">
+               <label for="filter_top" 
+                 onclick="enable_filter('filter_on_top', 'filter_top')">Top</label>
+-              <input type="number" id="filter_top" value="10" size="4" min="1"
++              <input type="number" id="filter_top" value="10" size="4" min="1" step="1"
+               onkeypress="num_keys(event); update_filter(event)" disabled>
+             </div>
+             <div >
+diff -r 02aa25f920a7 -r caa80f3ff934 website/cgi-bin/centrimo.tmpl
+--- a/website/cgi-bin/centrimo.tmpl	Fri Oct 05 09:45:00 2012 +1000
++++ b/website/cgi-bin/centrimo.tmpl	Fri Oct 05 00:26:25 2012 -0700
+@@ -165,7 +165,7 @@
+             </p>
+           </div>
+           <div class="meme">
+-          <form enctype="multipart/form-data" method="POST" action="centrimo.cgi" 
++          <form enctype="multipart/form-data" method="POST" novalidate action="centrimo.cgi" 
+           onsubmit="return on_form_submit()" onreset="return on_form_reset()">
+             <fieldset>
+               <legend>Data Submission Form</legend>
+@@ -301,7 +301,7 @@
+                   <h3 class="meme">Set a minimum acceptable match score (bits)</h3>
+                   <label for="min_score">score &ge;</label>
+                   <input class="meme" type="number" id="min_score"
+-                      name="min_score" size="3" value="5">
++                      name="min_score" size="3" value="5" step="any">
+                   <input class="meme" type="checkbox" id="opt_score"
+                       name="opt_score" value="1" style="margin-left:20px;">
+                   <label for="opt_score">optimize score?</label>
+@@ -314,14 +314,14 @@
+                   <label for="max_region" 
+                       onclick="$('use_max_region').click()">region width &le;</label>
+                   <input class="meme" type="number" id="max_region"
+-                      name="max_region" size="5" value="200"
++                      name="max_region" size="5" value="200" step="0.5"
+                       onkeypress="num_key(event)">
+                   <div class="help" onclick="help_popup(this, 'pop_max_region')"></div>
+                   
+                   <h3 class="meme">Set <i>E</i>-value threshold for reporting enriched regions</h3>
+                   <label for="ethresh"><i>E</i>-value &le;</label>
+                   <input class="meme" type="number" id="ethresh"
+-                      name="ethresh" size="5" value="10">
++                      name="ethresh" size="5" value="10" min="0" step="any">
+                   <div class="help" onclick="help_popup(this, 'pop_evalue_threshold')"></div>
+                   
+                   <h3 class="meme">Allow comparative sequences for binomial test?</h3>
+diff -r 02aa25f920a7 -r caa80f3ff934 website/cgi-bin/dreme.tmpl
+--- a/website/cgi-bin/dreme.tmpl	Fri Oct 05 09:45:00 2012 +1000
++++ b/website/cgi-bin/dreme.tmpl	Fri Oct 05 00:26:25 2012 -0700
+@@ -94,7 +94,7 @@
+             </p>
+           </div>
+           <div class="meme">
+-          <form enctype="multipart/form-data" method="POST" action="dreme.cgi" onsubmit="return check()">
++          <form enctype="multipart/form-data" method="POST" action="dreme.cgi" novalidate onsubmit="return check()">
+             <fieldset>
+               <legend>Data Submission Form</legend>
+               <p class="meme">Discover short regular expression motifs.</p> 
+@@ -194,7 +194,7 @@
+                   &le;
+                   <!-- without html 5 support this is just a text field -->
+                   <input type="number" name="limit_evalue" id="limit_evalue" 
+-                    class="meme" step="0.05" value="0.05" size="4"> 
++                    class="meme" step="any" value="0.05" min="0" size="4"> 
+                   <div class="help" onclick="help_popup(this, 'pop_limit_evalue')"></div><br/>
+                   <!-- /maximum evalue -->
+                   <!-- maximum count -->
+@@ -208,7 +208,7 @@
+                   </span> &le; 
+                   <!-- without html 5 support this is just a text field -->
+                   <input type="number" name="limit_count" id="limit_count" 
+-                    class="meme" disabled="disabled" step="1" value="10" size="4">
++                    class="meme" disabled="disabled" step="1" min="1" value="10" size="4">
+                   <div class="help" onclick="help_popup(this, 'pop_limit_count')"></div><br/>
+                   <!-- /maximum count -->
+                   <p>Note that the DREME webservice also enforces a time limit 
+diff -r 02aa25f920a7 -r caa80f3ff934 website/cgi-bin/meme-chip.pl
+--- a/website/cgi-bin/meme-chip.pl	Fri Oct 05 09:45:00 2012 +1000
++++ b/website/cgi-bin/meme-chip.pl	Fri Oct 05 00:26:25 2012 -0700
+@@ -177,7 +177,7 @@
+   $d{MEME_PAL} = $utils->param_bool($q, 'meme_pal');
+   # DREME Specific Options
+   # get the motif E-value cut-off threshold
+-  $d{DREME_E} = $utils->param_num($q, 'dreme_ethresh', 0, undef, 0.05);
++  $d{DREME_E} = $utils->param_num($q, 'dreme_ethresh', 'DREME E-value threshold', 0, undef, 0.05);
+   # get the optional motif count cut-off
+   if ($utils->param_bool($q, 'dreme_nmotifs_enable')) {
+     $d{DREME_M} = $utils->param_int($q, 'dreme_nmotifs', 
+@@ -185,13 +185,13 @@
+   }
+   # CentriMo Specific Options
+   # Get the minimum acceptable site score
+-  $d{CENTRIMO_SCORE} = $utils->param_num($q, 'centrimo_score', undef, undef, 5);
++  $d{CENTRIMO_SCORE} = $utils->param_num($q, 'centrimo_score', 'CentriMo minimum match score', undef, undef, 5);
+   # Get the optional maximum central window
+   if ($utils->param_bool($q, 'centrimo_maxreg_enable')) {
+-    $d{CENTRIMO_MAXREG} = $utils->param_int($q, 'centrimo_maxreg', 1, undef, 200);
++    $d{CENTRIMO_MAXREG} = $utils->param_num($q, 'centrimo_maxreg', 'CentriMo maximum central region width', 1, undef, 200);
+   }
+   # get the maximum central enrichment E-value to report
+-  $d{CENTRIMO_ETHRESH} = $utils->param_num($q, 'centrimo_ethresh', 0, undef, 10);
++  $d{CENTRIMO_ETHRESH} = $utils->param_num($q, 'centrimo_ethresh', 'CentriMo E-value threshold', 0, undef, 10);
+   # get if the seq IDs should be stored
+   $d{CENTRIMO_STORE_IDS} = $utils->param_bool($q, 'centrimo_store_ids');
+ 
+diff -r 02aa25f920a7 -r caa80f3ff934 website/cgi-bin/meme-chip.tmpl
+--- a/website/cgi-bin/meme-chip.tmpl	Fri Oct 05 09:45:00 2012 +1000
++++ b/website/cgi-bin/meme-chip.tmpl	Fri Oct 05 00:26:25 2012 -0700
+@@ -213,7 +213,7 @@
+           </div>
+           <div class="meme">
+           <form enctype="multipart/form-data" accept-charset="utf-8" 
+-          method="POST" action="meme-chip.cgi" 
++          method="POST" action="meme-chip.cgi" novalidate 
+           onsubmit="return on_form_submit()" onreset="return on_form_reset()">
+             <fieldset>
+               <legend>Data Submission Form</legend>
+@@ -322,20 +322,23 @@
+ 
+                 <h3 class="meme">How many motifs should MEME find?</h3>
+                 <label for="meme_nmotifs">Count of motifs:</label>
+-                <input class="meme" type="number" name="meme_nmotifs" value="3" 
+-                size="2" id="meme_nmotifs" onkeypress="num_key(event)">
++                <input class="meme" type="number" name="meme_nmotifs" value="3"
++                step="1" min="1" size="2" id="meme_nmotifs"
++                onkeypress="num_key(event)">
+                 <div class="help" onclick="help_popup(this, 'pop_meme_nmotifs')"></div>
+ 
+                 <h3 class="meme">What width motifs should MEME find?</h3>
+                 <span style="display:inline-block; min-width:12em;">
+                 <label for="meme_minw">Minimum width:</label>
+-                <input class="meme" type="number" name="meme_minw" value="6" 
+-                size="2" id="meme_minw" onkeypress="num_key(event)">
++                <input class="meme" type="number" name="meme_minw" value="6"
++                step="1" min="2" max="300" size="2" id="meme_minw"
++                onkeypress="num_key(event)">
+                 </span>
+ 
+                 <label for="meme_maxw">Maximum width:</label>
+-                <input class="meme" type="number" name="meme_maxw" value="30" 
+-                size="2" id="meme_maxw" onkeypress="num_key(event)">
++                <input class="meme" type="number" name="meme_maxw" value="30"
++                step="1" min="2" max="300"  size="2" id="meme_maxw"
++                onkeypress="num_key(event)">
+                 <div class="help" onclick="help_popup(this, 'pop_meme_width')"></div>
+ 
+                 <div id="meme_sites">
+@@ -346,16 +349,18 @@
+                   onclick="$('meme_minsites').disabled = !this.checked">
+                   <label for="meme_minsites" 
+                   onclick="$('meme_minsites_enable').click()">Minimum sites:</label>
+-                  <input class="meme" type="number" name="meme_minsites" value="2" 
+-                  size="2" id="meme_minsites" onkeypress="num_key(event)">
++                  <input class="meme" type="number" name="meme_minsites"
++                  value="2" step="1" min="2" max="600" size="2"
++                  id="meme_minsites" onkeypress="num_key(event)">
+                   </span>
+                   <input type="checkbox" value="1"
+                   name="meme_maxsites_enable" id="meme_maxsites_enable" 
+                   onclick="$('meme_maxsites').disabled = !this.checked">
+                   <label for="meme_maxsites" 
+                   onclick="$('meme_maxsites_enable').click()">Maximum sites:</label>
+-                  <input class="meme" type="number" name="meme_maxsites" value="600"
+-                  size="3" id="meme_maxsites" onkeypress="num_key(event)">
++                  <input class="meme" type="number" name="meme_maxsites"
++                  value="600" step="1" min="2" max="600" size="3"
++                  id="meme_maxsites" onkeypress="num_key(event)">
+                   <div class="help" onclick="help_popup(this, 'pop_meme_sites')"></div>
+                 </div>
+                 
+@@ -382,15 +387,17 @@
+                 <span style="display:inline-block; min-width:12em;">
+                 <label for="dreme_ethresh"><i>E</i>-value &le;</label>
+                 <input class="meme" type="number" name="dreme_ethresh" 
+-                id="dreme_ethresh" value="0.05" size="3">
++                value="0.05" step="any" min="0" size="3"
++                id="dreme_ethresh">
+                 </span>
+                 <input class="meme" type="checkbox" name="dreme_nmotifs_enable" 
+                 value="1" id="dreme_nmotifs_enable" 
+                 onclick="$('dreme_nmotifs').disabled = !this.checked">
+                 <label for="dreme_nmotifs" 
+                 onclick="$('dreme_nmotifs_enable').click()">Count &le;</label>
+-                <input class="meme" type="number" name="dreme_nmotifs" value="10" 
+-                size="2" id="dreme_nmotifs" onkeypress="num_key(event)">
++                <input class="meme" type="number" name="dreme_nmotifs"
++                value="10" step="1" min="1" size="2"
++                id="dreme_nmotifs" onkeypress="num_key(event)">
+                 <div class="help" onclick="help_popup(this, 'pop_dreme_limits')"></div>
+               </div>
+               <!-- /DREME Options -->
+@@ -410,7 +417,7 @@
+                 <h3 class="meme">Set a minimum acceptable match score (bits)</h3>
+                 <label for="centrimo_score">score &ge;</label>
+                 <input class="meme" type="number" name="centrimo_score" 
+-                size="3" value="5" id="centrimo_score">
++                size="3" value="5" step="any" id="centrimo_score">
+                 <div class="help" onclick="help_popup(this, 'pop_centrimo_score')"></div>
+ 
+                 <h3 class="meme">Set the maximum allowed width of central region</h3>
+@@ -421,13 +428,15 @@
+                 onclick="$('centrimo_maxreg_enable').click()"
+                 >region width &le;</label>
+                 <input class="meme" type="number" name="centrimo_maxreg" 
+-                size="5" value="200" id="centrimo_maxreg" onkeypress="num_key(event)">
++                size="5" value="200" step="0.5" min="1" 
++                id="centrimo_maxreg" onkeypress="num_key(event)">
+                 <div class="help" onclick="help_popup(this, 'pop_centrimo_maxreg')"></div>
+ 
+                 <h3 class="meme">Set <i>E</i>-value threshold for reporting centrally enriched regions</h3>
+                 <label for="centrimo_ethresh"><i>E</i>-value &le;</label>
+                 <input class="meme" type="number" name="centrimo_ethresh" 
+-                size="5" value="10" id="centrimo_ethresh" >
++                size="5" value="10" step="any" min="0.00000001" 
++                id="centrimo_ethresh">
+                 <div class="help" onclick="help_popup(this, 'pop_centrimo_ethresh')"></div>
+                   
+                 <h3 class="meme">Include sequence IDs</h3>
+diff -r 02aa25f920a7 -r caa80f3ff934 website/cgi-bin/tomtom.tmpl
+--- a/website/cgi-bin/tomtom.tmpl	Fri Oct 05 09:45:00 2012 +1000
++++ b/website/cgi-bin/tomtom.tmpl	Fri Oct 05 00:26:25 2012 -0700
+@@ -233,7 +233,7 @@
+             </p>
+           </div>
+           <div class="meme">
+-          <form enctype="multipart/form-data" method="POST" action="tomtom.cgi" onsubmit="return check()">
++          <form enctype="multipart/form-data" method="POST" action="tomtom.cgi" novalidate onsubmit="return check()">
+             <fieldset>
+               <legend>Data Submission Form</legend>
+               <p class="meme">Search one or more DNA motifs against a DNA motif database.</p> 
+@@ -461,7 +461,7 @@
+                   </select>
+                    &lt;
+                   <!-- without html 5 support this is just a text field -->
+-                  <input type="number" name="thresh" id="thresh" class="meme" step="0.10" value="10" size="4"> 
++                  <input type="number" name="thresh" id="thresh" class="meme" step="any" value="10" size="4"> 
+                   <div class="help" onclick="help_popup(this, 'pop_thresh')"></div><br>
+                 </div>
+                 <!-- Complete scoring -->

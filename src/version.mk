@@ -1,3 +1,3 @@
-MEMEVER = 4.8.1
+MEMEVER = 4.9.0
 RELEASE = 0
 
