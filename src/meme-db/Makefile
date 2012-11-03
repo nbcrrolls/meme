@@ -1,9 +1,13 @@
-# $Id: Makefile,v 1.3 2012/10/25 21:41:18 nadya Exp $
+# $Id: Makefile,v 1.4 2012/11/03 00:55:07 nadya Exp $
 #
 # @Copyright@
 # @Copyright@
 #
 # $Log: Makefile,v $
+# Revision 1.4  2012/11/03 00:55:07  nadya
+# don't copy 2 db files, add them via patch mechanism.
+# at compile time correct index files are created where needed
+#
 # Revision 1.3  2012/10/25 21:41:18  nadya
 # update db root dir
 #
@@ -17,8 +21,7 @@
 # initial
 #
 
-PKGROOT_DB = /state/partition1/meme/db
-PKGROOT= /opt/meme_$(MEMEVER)
+PKGROOT = /state/partition1/meme/db
 
 REDHAT.ROOT = $(CURDIR)/../../
 
@@ -36,12 +39,9 @@ build: version.mk
 
 	
 install::
-	mkdir -p $(ROOT)/$(PKGROOT_DB)
-	cp -r $(GOMO) $(ROOT)/$(PKGROOT_DB)
-	cp -r $(MOTIF) $(ROOT)/$(PKGROOT_DB)
-	mkdir -p $(ROOT)/$(PKGROOT)/etc
-	cp $(GOMO)/gomo_db.csv $(ROOT)/$(PKGROOT)/etc
-	cp $(MOTIF)/motif_db.csv $(ROOT)/$(PKGROOT)/etc
+	mkdir -p $(ROOT)/$(PKGROOT)
+	cp -r $(GOMO) $(ROOT)/$(PKGROOT)
+	cp -r $(MOTIF) $(ROOT)/$(PKGROOT)
 
 clean::
 	rm -rf version.mk
