@@ -1,9 +1,12 @@
-# $Id: Makefile,v 1.4 2012/10/24 23:05:39 nadya Exp $
+# $Id: Makefile,v 1.5 2012/11/03 01:22:13 nadya Exp $
 #
 # @Copyright@
 # @Copyright@
 #
 # $Log: Makefile,v $
+# Revision 1.5  2012/11/03 01:22:13  nadya
+# add deployment for old version
+#
 # Revision 1.4  2012/10/24 23:05:39  nadya
 # fix permissions
 #
@@ -25,17 +28,24 @@ include Rules.mk
 SEDSPEC += \
         -e 's%@MEMEVER@%$(MEMEVER)%g' 
 
+SEDSPECPREV += \
+            -e 's%@MEMEVER@%$(MEMEPREV)%g' 
+
 version.mk:
 	cat version.mk.in ../version.mk > version.mk
 
 deploy_meme_$(MEMEVER).sh: deploy_meme.sh.in
 	$(SED) $(SEDSPEC) $^ > $@
 
-build: deploy_meme_$(MEMEVER).sh
+deploy_meme_$(MEMEPREV).sh: deploy_meme.sh.in
+	$(SED) $(SEDSPECPREV) $^ > $@
+
+build: deploy_meme_$(MEMEVER).sh deploy_meme_$(MEMEPREV).sh
 	
 install::
 	mkdir -p $(ROOT)/$(PKGROOT)
 	$(INSTALL)  -m 0755  deploy_meme_$(MEMEVER).sh  $(ROOT)/$(PKGROOT)
+	$(INSTALL)  -m 0755  deploy_meme_$(MEMEPREV).sh  $(ROOT)/$(PKGROOT)
 
 clean::
-	rm -rf version.mk deploy_meme_$(MEMEVER).sh
+	rm -rf version.mk deploy_meme_*.sh
