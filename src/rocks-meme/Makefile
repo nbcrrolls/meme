@@ -27,7 +27,7 @@ install::
 	mkdir -p $(ROOT)/etc/cron.daily 
 	$(INSTALL) -m755 meme-jobs-cleanup $(ROOT)/etc/cron.daily/meme-jobs-cleanup-$(MEMEVER)
 	mkdir -p $(ROOT)/etc/cron.monthly 
-	$(INSTALL) -m755 meme-update-db $(ROOT)/etc/cron.monthly
+	$(INSTALL) -m755 meme-update-db $(ROOT)/etc/cron.monthly/meme-update-db-$(MEMEVER)
 	mkdir -p $(ROOT)/var/www/html/downloads
 	$(INSTALL) -m644 index.html $(ROOT)/var/www/html/downloads
 	mkdir -p $(ROOT)/etc/httpd/conf.d
