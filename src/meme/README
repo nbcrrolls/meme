@@ -1,0 +1,10 @@
+When updating to a NEW version versionX:
+
+1 Update gomo_db.csv and motif_db.csv:
+  extract them from <roll/src/meme-db/*.tgz files and put in ./patch-files/versionX/etc
+  for each meme version.  These allows for creation of index files during compile step.
+2. update 2 versions in src/version.mk (new and previous)
+3. mkdir patch-files/versionX/etc/ and add patched Makefile.in 
+   make targets install-data-hook and uninstall-hook empty (opal service deploy related)
+4 meme-previous/Makefile is based on meme/Makefile. 
+  If meme/Makefile changes, the other file may need modification.
