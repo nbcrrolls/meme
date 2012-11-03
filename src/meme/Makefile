@@ -1,9 +1,12 @@
-# $Id: Makefile,v 1.8 2012/10/30 21:15:52 nadya Exp $
+# $Id: Makefile,v 1.9 2012/11/03 00:47:44 nadya Exp $
 #
 # @Copyright@
 # @Copyright@
 #
 # $Log: Makefile,v $
+# Revision 1.9  2012/11/03 00:47:44  nadya
+# clean old meme distro.
+#
 # Revision 1.8  2012/10/30 21:15:52  nadya
 # fix paths used by update script during compile
 #
@@ -40,7 +43,7 @@ include Rules.mk
 
 
 version.mk:
-	cat version.mk.in ../version.mk > version.mk
+	cat ../version.mk version.mk.in  > version.mk
 
 SEDSPEC += \
         -e 's%@MEMEVER@%$(MEMEVER)%g' \
@@ -116,4 +119,4 @@ install::
 clean::
 	rm -rf version.mk
 	rm -rf update-csv.sh update-csv-bootstrap.sh
-	rm -rf $(NAME)_$(MEMEVER) $(RSATWS)
+	rm -rf $(NAME)_$(MEMEVER) $(RSATWS)  $(NAME)_$(MEMEPREV)
