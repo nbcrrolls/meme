@@ -15,6 +15,9 @@
 
 	<changelog>
 	$Log: meme-server.xml.in,v $
+	Revision 1.7  2012/11/03 00:19:12  nadya
+	need to have 2 meme versions on the server: add post for previous version
+	
 	Revision 1.6  2012/10/26 22:50:51  nadya
 	restart httpd after adding apache redirect
 	
@@ -52,6 +55,10 @@ if [ -e /var/www/html/meme ] ; then
 fi
 ln -s /opt/meme_MEMEVER/web /var/www/html/meme_MEMEVER
 ln -s /opt/meme_MEMEVER/web /var/www/html/meme
+
+if [ ! -e /var/www/html/meme_MEMEPREV ] ; then
+    ln -s /opt/meme_MEMEPREV/web /var/www/html/meme_MEMEPREV
+fi
 
 
 <!-- mounting NFS-shared directory for meme db and output -->

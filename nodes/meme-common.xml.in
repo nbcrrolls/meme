@@ -15,6 +15,9 @@
 
 	<changelog>
 	$Log: meme-common.xml.in,v $
+	Revision 1.5  2012/11/03 00:19:12  nadya
+	need to have 2 meme versions on the server: add post for previous version
+	
 	Revision 1.4  2012/10/26 01:35:43  nadya
 	add ImageMagick package
 	
@@ -33,6 +36,7 @@
 	</changelog>
 
 	<package>meme</package>
+	<package>memeprev</package>
 	<package>ImageMagick</package>
 	<package>opt-perl-HTML-Template</package>
 
@@ -52,6 +56,11 @@ if [ "$SERVER_NAME" == "" ] ; then
 fi
 
 change_list=`grep -r -l $tempname /opt/meme_MEMEVER/[!d]*`
+for i in $change_list; do \
+    sed -i "s/$tempname/$SERVER_NAME/g" $i; \
+done
+
+change_list=`grep -r -l $tempname /opt/meme_MEMEPREV/[!d]*`
 for i in $change_list; do \
     sed -i "s/$tempname/$SERVER_NAME/g" $i; \
 done
