@@ -1,9 +1,12 @@
-# $Id: Makefile,v 1.5 2012/11/03 01:22:13 nadya Exp $
+# $Id: Makefile,v 1.6 2012/11/05 22:43:37 nadya Exp $
 #
 # @Copyright@
 # @Copyright@
 #
 # $Log: Makefile,v $
+# Revision 1.6  2012/11/05 22:43:37  nadya
+# add undeploy scripts
+#
 # Revision 1.5  2012/11/03 01:22:13  nadya
 # add deployment for old version
 #
@@ -40,12 +43,18 @@ deploy_meme_$(MEMEVER).sh: deploy_meme.sh.in
 deploy_meme_$(MEMEPREV).sh: deploy_meme.sh.in
 	$(SED) $(SEDSPECPREV) $^ > $@
 
-build: deploy_meme_$(MEMEVER).sh deploy_meme_$(MEMEPREV).sh
+undeploy_meme_$(MEMEVER).sh: undeploy_meme.sh.in
+	$(SED) $(SEDSPEC) $^ > $@
+
+undeploy_meme_$(MEMEPREV).sh: undeploy_meme.sh.in
+	$(SED) $(SEDSPECPREV) $^ > $@
+
+build: deploy_meme_$(MEMEVER).sh deploy_meme_$(MEMEPREV).sh undeploy_meme_$(MEMEVER).sh undeploy_meme_$(MEMEPREV).sh
 	
 install::
 	mkdir -p $(ROOT)/$(PKGROOT)
-	$(INSTALL)  -m 0755  deploy_meme_$(MEMEVER).sh  $(ROOT)/$(PKGROOT)
-	$(INSTALL)  -m 0755  deploy_meme_$(MEMEPREV).sh  $(ROOT)/$(PKGROOT)
+	$(INSTALL)  -m 0755  *deploy_meme_$(MEMEVER).sh  $(ROOT)/$(PKGROOT)
+	$(INSTALL)  -m 0755  *deploy_meme_$(MEMEPREV).sh  $(ROOT)/$(PKGROOT)
 
 clean::
-	rm -rf version.mk deploy_meme_*.sh
+	rm -rf version.mk *deploy_meme_*.sh

@@ -1,0 +1,42 @@
+#!/bin/bash
+
+VER=@MEMEVER@
+ANT=/opt/rocks/bin/ant
+OPALXML=/opt/opal/build.xml
+
+echo ant -f $OPALXML deploy -DserviceName=FIMO_${VER} 
+     ant -f $OPALXML deploy -DserviceName=FIMO_${VER} 
+
+echo ant -f $OPALXML deploy -DserviceName=MEME_${VER} 
+     ant -f $OPALXML deploy -DserviceName=MEME_${VER} 
+
+echo ant -f $OPALXML deploy -DserviceName=MAST_${VER} 
+     ant -f $OPALXML deploy -DserviceName=MAST_${VER} 
+
+echo ant -f $OPALXML deploy -DserviceName=GLAM2_${VER} 
+     ant -f $OPALXML deploy -DserviceName=GLAM2_${VER} 
+
+echo ant -f $OPALXML deploy -DserviceName=GLAM2SCAN_${VER} 
+     ant -f $OPALXML deploy -DserviceName=GLAM2SCAN_${VER} 
+
+echo ant -f $OPALXML deploy -DserviceName=GOMO_${VER} 
+     ant -f $OPALXML deploy -DserviceName=GOMO_${VER} 
+
+echo ant -f $OPALXML deploy -DserviceName=MCAST_${VER} 
+     ant -f $OPALXML deploy -DserviceName=MCAST_${VER} 
+
+echo ant -f $OPALXML deploy -DserviceName=TOMTOM_${VER} 
+     ant -f $OPALXML deploy -DserviceName=TOMTOM_${VER} 
+
+echo ant -f $OPALXML deploy -DserviceName=SPAMO_${VER} 
+     ant -f $OPALXML deploy -DserviceName=SPAMO_${VER} 
+
+echo ant -f $OPALXML deploy -DserviceName=MEMECHIP_${VER} 
+     ant -f $OPALXML deploy -DserviceName=MEMECHIP_${VER} 
+
+echo ant -f $OPALXML deploy -DserviceName=DREME_${VER} 
+     ant -f $OPALXML deploy -DserviceName=DREME_${VER} 
+
+echo ant -f $OPALXML deploy -DserviceName=CENTRIMO_${VER} 
+     ant -f $OPALXML deploy -DserviceName=CENTRIMO_${VER} 
+
