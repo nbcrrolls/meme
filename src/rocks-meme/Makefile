@@ -44,8 +44,6 @@ install::
 	$(INSTALL) -m755 meme-update-db-$(MEMEPREV) $(ROOT)/etc/cron.monthly/
 	mkdir -p $(ROOT)/var/www/html/downloads
 	$(INSTALL) -m644 index.html $(ROOT)/var/www/html/downloads
-	mkdir -p $(ROOT)/etc/httpd/conf.d
-	$(INSTALL) -m644 meme.conf $(ROOT)/etc/httpd/conf.d
 
 clean::
 	rm -f $(NAME).spec.in
