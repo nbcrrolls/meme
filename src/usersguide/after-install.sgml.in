@@ -5,23 +5,30 @@
 <title>What is installed on a frontend</title>
 <itemizedlist>
 <listitem> <para>/opt/meme_@MEMEVER@ (meme suit) </para></listitem>
+<listitem> <para>/opt/meme_@MEMEPREV@ (meme suit previous version) </para></listitem>
 <listitem> <para>/opt/meme -> /opt/meme_@MEMEVER@ </para></listitem>
 <listitem> <para>/opt/meme_@MEMEVER@/bin/update-csv.sh (script to update db csv files) </para></listitem>
 <listitem> <para>/var/www/html/meme -> /opt/meme_@MEMEVER@/web (link to cgi web interface)</para></listitem>
 <listitem> <para>/var/www/html/meme_@MEMEVER@ -> /opt/meme_@MEMEVER@/web (link to cgi web interface)</para></listitem>
+<listitem> <para>/var/www/html/meme_@MEMEPREV@ -> /opt/meme_@MEMEPREV@/web (link to cgi web interface)</para></listitem>
 <listitem> <para>/var/www/html/roll-documentation/meme (roll docs) </para></listitem>
-<listitem> <para>/etc/cron.daily/meme-job-cleanup (cron job to clean old job dirs) </para></listitem>
-<listitem> <para>/etc/cron.monthly/meme-update-db (cron job to update db) </para></listitem>
+<listitem> <para>/etc/cron.daily/meme-job-cleanup-@MEMEVER@ (cron job to clean old job dirs) </para></listitem>
+<listitem> <para>/etc/cron.daily/meme-job-cleanup-@MEMEPREV@ (cron job to clean old job dirs) </para></listitem>
+<listitem> <para>/etc/cron.monthly/meme-update-db-@MEMEVER@ (cron job to update db) </para></listitem>
+<listitem> <para>/etc/cron.monthly/meme-update-db-@MEMEPREV@ (cron job to update db) </para></listitem>
 <listitem> <para>/share/meme/db (gomo, motif and fasta dbs) </para></listitem>
 <listitem> <para>/share/meme/output (for tomtom jobs temp files) </para></listitem>
 <listitem> <para>/share/meme/user-files (for CGI jtemp files) </para></listitem>
-<listitem> <para>/opt/meme_@MEMEVER@/web/output --> /share/meme/output </para></listitem>
-<listitem> <para>/opt/meme_@MEMEVER@/web/user-files --> /share/meme/user-files </para></listitem>
+<listitem> <para>/opt/meme_@MEMEVER@/web/output --> /share/meme/output-@MEMEVER@ </para></listitem>
+<listitem> <para>/opt/meme_@MEMEPREV@/web/output --> /share/meme/output-@MEMEVER@ </para></listitem>
+<listitem> <para>/opt/meme_@MEMEVER@/web/user-files --> /share/meme/user-files-@MEMEVER@ </para></listitem>
+<listitem> <para>/opt/meme_@MEMEPREV@/web/user-files --> /share/meme/user-files-@MEMEVER@ </para></listitem>
 <listitem> <para>/opt/perl/lib/site_perl/5.14.2/Class/Std </para></listitem>
 <listitem> <para>/opt/perl/lib/site_perl/5.14.2/Class/Std/Fast </para></listitem>
 <listitem> <para>/opt/perl/lib/site_perl/5.14.2/SOAP/WSDL </para></listitem>
 <listitem> <para>/opt/perl/lib/site_perl/5.14.2/Date </para></listitem>
 <listitem> <para>/opt/perl/lib/site_perl/5.14.2/Time </para></listitem>
+<listitem> <para>/opt/perl/lib/site_perl/5.14.2/HTML/Template </para></listitem>
 </itemizedlist>
 </simplesect>
 
@@ -29,16 +36,17 @@
 <title>What is installed on compute nodes</title>
 <itemizedlist>
 <listitem> <para>/opt/meme_@MEMEVER@ (meme suit) </para></listitem>
+<listitem> <para>/opt/meme_@MEMEPREV@ (meme suit) </para></listitem>
 <listitem> <para>/opt/meme -> /opt/meme_@MEMEVER@ </para></listitem>
+<listitem> <para>/opt/perl/lib/site_perl/5.14.2/HTML/Template </para></listitem>
 </itemizedlist>
 </simplesect>
 
 <simplesect>
 <title>Databases update </title>
 <para>
-A directory /share/meme/db holds 3 different databases: gomo, motif, and fasta. 
-The first 2 are installed with the roll. The fasta databases need to be uploaded 
-after installing the roll. 
+A directory /share/meme/db holds 3 different databases: gomo, motif, and fasta.  The first 2 are 
+installed with the roll. The fasta databases need to be uploaded after installing the roll. 
 The fasta databases can be very large (~600-800GB) and depending on your filesystem layout a
 separate partition for fasta databases need to be created. For example, your /state/partition1
 is only 100Gb and we expect fasta databases be around 600Gb. There is another filesystem /data

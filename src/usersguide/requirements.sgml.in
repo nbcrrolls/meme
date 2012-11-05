@@ -19,17 +19,30 @@ Opal roll (is required only for web submission).
 </itemizedlist>
 
 <para>
+ImageMagick is needed by some scripts. Usually, ImageMagick is already installed
+on a frontend and may only need to be added on compute nodes. The addition of needed RPMs
+is handled by the meme roll.
+</para>
+
+<para>
 This roll provides:
 </para>
 
 <itemizedlist>
 <listitem><para> meme @MEMEVER@ </para></listitem>
+<listitem><para> meme @MEMEPREV@ </para></listitem>
 <listitem><para> perl(SOAP::WSDL) </para></listitem>
 <listitem><para> perl(Class::Std) </para></listitem>
 <listitem><para> perl(Class::Std::Fast) </para></listitem>
 <listitem><para> perl(Class::Std::Fast::Storable) </para></listitem>
 <listitem><para> perl(Date) </para></listitem>
 <listitem><para> perl(Time::Zone) </para></listitem>
+<listitem><para> perl(HTML::Template) </para></listitem>
+<listitem><para> gomo databases </para></listitem>
+<listitem><para> motif databases </para></listitem>
+<listitem><para> opal services deploy/undeploy scripts </para></listitem>
+<listitem><para> cron job (clean jobs  direcotries) </para></listitem>
+<listitem><para> cron job (update fasta databases) </para></listitem>
 </itemizedlist>
 
 </chapter>

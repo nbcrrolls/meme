@@ -7,7 +7,7 @@ Please visit the <ulink url="http://meme.nbcr.net/">official MEME site</ulink> t
 
 <para>
 The meme roll will install meme v.@MEMEVER@ distribution in /opt/meme_@MEMEVER@ and configure
-web service for it. 
+web service for it. In addition, it will install the previous meme version @MEMEPREV@ and configure it.
 </para>
 <para>
 Required databases will need to be uploaded after the roll install. 
