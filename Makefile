@@ -1,10 +1,13 @@
 #
-# $Id: Makefile,v 1.4 2012/10/30 21:22:32 nadya Exp $
+# $Id: Makefile,v 1.5 2012/11/07 22:49:21 nadya Exp $
 #
 # @Copyright@
 # @Copyright@
 #
 # $Log: Makefile,v $
+# Revision 1.5  2012/11/07 22:49:21  nadya
+# add regex for MEMEPREV in sed. add cleaning
+#
 # Revision 1.4  2012/10/30 21:22:32  nadya
 # don't clean nodes/
 #
@@ -22,14 +25,25 @@
 -include $(ROLLSROOT)/etc/Rolls.mk
 include Rolls.mk
 
+version.mk:
+	grep "MEMEVER =" src/version.mk > version.mk
+	grep "MEMEPREV =" src/version.mk >> version.mk
+	cat version.mk.in >> version.mk
+
 default: 
 	for i in `ls nodes/*.xml.in`; do \
 	    export o=`echo $$i | sed 's/\.in//'`; \
 	    cp $$i $$o; \
-	    sed -i "s/MEMEVER/$(MEMEVER)/g" $$o; \
+	    sed -i -e "s/MEMEVER/$(MEMEVER)/g" -e "s/MEMEPREV/$(MEMEPREV)/g" $$o; \
 	done
 	$(MAKE) roll
 
 clean::
-	rm -rf extramods
+	rm -rf extramods _arch bootstrap.py
+	rm -rf version.mk
 
+cvsclean:: clean
+	for i in `ls nodes/*.xml`; do \
+	    export o=`echo $$i | sed 's/\.in//'`; \
+	    rm -rf  $$o; \
+	done
