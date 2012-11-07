@@ -63,7 +63,7 @@ The databases need to be available on all compute nodes, so /data/meme/fasta_dat
 need to be available (automount) on all compute nodes. Please update automount maps accordingly
 </para>
 <para>
-Monthly cron job /etc/cron.monthly/meme-update-db takes care of updating csv files and
+Monthly cron job /etc/cron.monthly/meme-update-db-(version) takes care of updating csv files and
 uploading the fasta databases.  After installing the roll run this command directly to
 upload the databases first time:
 </para>

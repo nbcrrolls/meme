@@ -12,7 +12,7 @@ SEDSPEC += \
 	-e 's%@YEAR@%$(YEAR)%g' \
 	-e 's%@NAME@%$(NAME)%g' \
 	-e 's%@MEMEVER@%$(MEMEVER)%g' \
-	-e 's%@MEMEVER@%$(MEMEPREV)%g' \
+	-e 's%@MEMEPREV@%$(MEMEPREV)%g' \
 	-e 's%@ROCKS_VERSION@%$(ROCKS_VERSION)%g' 
 
 version.mk:

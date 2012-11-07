@@ -1,14 +1,15 @@
 <chapter id="contact" xreflabel="Getting Help">
 <title>Getting Help</title>
 
-<para>
-For questions related to obtaining or installing MEME Roll please send an email to 
+<itemizedlist>
+<listitem><para>For questions related to obtaining or installing MEME Roll please send an email to 
 <ulink url="mailto:admin@nbcr.net">NBSR support</ulink>.
-</para>
+</para></listitem>
 
-<para>
-For questions about using MEME software please eend an email to 
-<ulink url="mailto:meme@nbcr.net">MEME Suit email support</ulink>.
-</para>
+<listitem><para>For questions about using MEME software please send an email to 
+<ulink url="mailto:meme@nbcr.net">MEME support</ulink>.
+</para></listitem>
+
+</itemizedlist>
 
 </chapter>

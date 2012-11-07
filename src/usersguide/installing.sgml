@@ -1,7 +1,47 @@
 <chapter id="installing" xreflabel="Installing">
 <title>Installing MEME Roll </title>
 
-&source-roll-installing-standard;
-&source-roll-installing-onthefly;
+<simplesect>
+<title>On a New Server</title>
+<para>
+The MEME roll can be installed during the initial installation of your cluster. This procedure is documented
+in the <ulink url="http://yourservername/roll-documentation/base/&document-version;/installing.html">Rocks usersguide </ulink>.
+You should select the MEME roll from the list of available rolls when you see a screen that lists
+the available rolls. This requires an MEME roll to be added to your network rolls server.
+If your network server does not have this roll added, the roll can be added from a CD media (burn a CD with the roll iso).
+</para>
+</simplesect>
+
+<simplesect>
+<title>On an Existing Server</title>
+
+<para>
+The MEME roll may also be added to an existing server (or frontend). For sake of discussion, 
+assume that you have an iso image of the roll called meme-&document-version;.iso. 
+The following procedure will install the roll, and deploy the webservice. 
+</para>
+
+<screen>
+$ su - root
+# rocks add roll meme-&document-version;.iso
+# rocks enable roll meme
+# cd /export/rocks/install; rocks create distro
+# rocks run roll meme | bash
+</screen>
+
+</simplesect>
+
+<simplesect>
+<title>Adding roll to the nodes </title>
+<para>
+To add the the MEME roll to the nodes of your cluster, you'll need to reinstall the nodes.
+To reinstall all your nodes, as root execute:
+<screen>
+# rocks set host compute boot action=install
+# rocks run host compute command=reboot
+</screen>
+
+</para>
+</simplesect>
 
 </chapter>
