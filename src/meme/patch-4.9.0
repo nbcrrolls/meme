@@ -1,3 +1,4 @@
 #!/bin/bash
 
 patch -p1 -i ../patches/patch_4.9.0_1
+patch -p1 -i ../patches/patch_4.9.0_2
