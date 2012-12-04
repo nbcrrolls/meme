@@ -1,10 +1,12 @@
 #!/bin/bash
 #
-# $Id: bootstrap.sh,v 1.2 2012/10/26 22:55:23 nadya Exp $
+# $Id: bootstrap.sh,v 1.3 2012/12/04 22:29:48 nadya Exp $
 #
 # Run before making a roll. 
 # Create and install (in src/RPMS) prereq perl modules rpms
 #
+
+IGNORE="--default-ignorelist --ignorelist `pwd`/modules-ignore"
 
 export PATH=/opt/perl/bin:$PATH
 DIR=`pwd`
@@ -16,35 +18,35 @@ fi
 cd $EXTRA
 
 doClassStd () {
-/opt/perl/bin/cpan2dist --format CPANPLUS::Dist::Rocks --default-ignorelist  Class::Std
+/opt/perl/bin/cpan2dist --format CPANPLUS::Dist::Rocks $IGNORE  Class::Std
 MOD=`ls Class-Std/noarch/*.rpm`
 rpm -i $MOD
 cp $MOD ../src/RPMS
 }
 
 doClassStdFast () {
-/opt/perl/bin/cpan2dist --format CPANPLUS::Dist::Rocks --default-ignorelist  Class::Std::Fast
+/opt/perl/bin/cpan2dist --format CPANPLUS::Dist::Rocks $IGNORE  Class::Std::Fast
 MOD=`ls Class-Std-Fast/noarch/*.rpm`
 rpm -i $MOD
 cp $MOD ../src/RPMS
 }
 
-doDateFormat () {
-/opt/perl/bin/cpan2dist --format CPANPLUS::Dist::Rocks --default-ignorelist Date::Format
+doTimeDate () {
+/opt/perl/bin/cpan2dist --format CPANPLUS::Dist::Rocks $IGNORE Date::Format
 MOD=`ls TimeDate/noarch/*.rpm`
 rpm -i $MOD
 cp $MOD ../src/RPMS
 }
 
 doSoapWsdl () {
-/opt/perl/bin/cpan2dist --format CPANPLUS::Dist::Rocks --default-ignorelist SOAP::WSDL
+/opt/perl/bin/cpan2dist --format CPANPLUS::Dist::Rocks $IGNORE SOAP::WSDL
 MOD=`ls SOAP-WSDL/noarch/*.rpm`
 rpm -i $MOD
 cp $MOD ../src/RPMS
 }
 
 doHTMLTemplate () {
-/opt/perl/bin/cpan2dist --format CPANPLUS::Dist::Rocks --default-ignorelist HTML::Template
+/opt/perl/bin/cpan2dist --format CPANPLUS::Dist::Rocks $IGNORE HTML::Template
 MOD=`ls HTML-Template/noarch/*.rpm`
 rpm -i $MOD
 cp $MOD ../src/RPMS
@@ -53,7 +55,7 @@ cp $MOD ../src/RPMS
 ### main 
 doClassStd
 doClassStdFast
-doDateFormat
+doTimeDate
 doSoapWsdl
 doHTMLTemplate
 

@@ -1,0 +1,6 @@
+^APR::Table$
+^Apache2::Const$
+^Apache2::Log$
+^Apache2::RequestIO$
+^Apache2::RequestRec$
+^Apache2::RequestUtil$
