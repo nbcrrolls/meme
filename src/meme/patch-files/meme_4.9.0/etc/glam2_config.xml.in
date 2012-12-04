@@ -1,5 +1,5 @@
 <appConfig xmlns="http://nbcr.sdsc.edu/opal/types" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-  <metadata appName="GLAM2_@SERVICE_VERSION@">
+  <metadata appName="GLAM2 @SERVICE_VERSION@">
     <usage>GLAM2: Find gapped local alignment motifs</usage>
     <info xsd:type="xsd:string">
     <![CDATA[

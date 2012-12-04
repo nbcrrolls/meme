@@ -1,5 +1,5 @@
 <appConfig xmlns="http://nbcr.sdsc.edu/opal/types" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-  <metadata appName="SPAMO_@SERVICE_VERSION@">
+  <metadata appName="SPAMO @SERVICE_VERSION@">
     <usage>SPAMO: Find co-factor motifs by looking for motifs which appear at significant spacings to a primary motif</usage>
     <info>
     <![CDATA[

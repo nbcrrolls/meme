@@ -1,5 +1,5 @@
 <appConfig xmlns="http://nbcr.sdsc.edu/opal/types" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-  <metadata appName="MEMECHIP_@SERVICE_VERSION@">
+  <metadata appName="MEMECHIP @SERVICE_VERSION@">
     <usage>MEMECHIP: Run MEME, DREME, TOMTOM and some other MEME Suite programs on ChIP-seq data</usage>
     <info xsd:type="xsd:string">
     <![CDATA[

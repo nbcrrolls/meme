@@ -1,5 +1,5 @@
 <appConfig xmlns="http://nbcr.sdsc.edu/opal/types" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-  <metadata appName="MAST_@SERVICE_VERSION@">
+  <metadata appName="MAST @SERVICE_VERSION@">
     <usage>MAST: Search for groups of motifs in sequence databases</usage>
     <info xsd:type="xsd:string">
     <![CDATA[    

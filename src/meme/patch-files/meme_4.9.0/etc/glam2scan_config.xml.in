@@ -1,5 +1,5 @@
 <appConfig xmlns="http://nbcr.sdsc.edu/opal/types" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-  <metadata appName="GLAM2SCAN_@SERVICE_VERSION@">
+  <metadata appName="GLAM2SCAN @SERVICE_VERSION@">
     <usage>GLAM2SCAN: Find GLAM2 motifs in sequences</usage>
     <info xsd:type="xsd:string">
     <![CDATA[
