@@ -13,8 +13,18 @@ LOG=/tmp/meme-update-db.log
 OPTS="-upstream -noclobber"
 
 date > $LOG
-
 if [ -x $UPDATEDB ] ; then
     $UPDATEDB $OPTS >> $LOG
 fi
+
+# mail log file
+MSG=/tmp/meme-message
+ATTACH=meme-update-db-`date +%Y-%m-%d`.log.gz
+TO=meme@nbcr.net
+
+cat $LOG | gzip > $ATTACH
+echo "Update DB log file, run on `date +%Y-%m-%d ` " > $MSG
+mailx -r meme@rollhost -s "meme db update on rollhost" -a $ATTACH $TO < $MSG
+
+rm -rf $MSG $ATTACH
 
