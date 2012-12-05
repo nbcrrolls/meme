@@ -15,6 +15,9 @@
 
 	<changelog>
 	$Log: meme-common.xml.in,v $
+	Revision 1.6  2012/12/05 16:57:40  nadya
+	update server name in cron files
+	
 	Revision 1.5  2012/11/03 00:19:12  nadya
 	need to have 2 meme versions on the server: add post for previous version
 	
@@ -65,6 +68,10 @@ for i in $change_list; do \
     sed -i "s/$tempname/$SERVER_NAME/g" $i; \
 done
 
+change_list=`grep -r -l $tempname /etc/cron.monthly/meme*`
+for i in $change_list; do \
+    sed -i "s/$tempname/$SERVER_NAME/g" $i; \
+done
 
 </post>
 
