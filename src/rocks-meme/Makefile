@@ -18,22 +18,25 @@ version.mk:
 
 meme-update-db-$(MEMEVER):  meme-update-db.in
 	$(SED) $(SEDSPEC) $^ > $@
-	chmod 755 $@
 
 meme-update-db-$(MEMEPREV):  meme-update-db.in
 	$(SED) $(SEDSPECPREV) $^ > $@
-	chmod 755 $@
 
 meme-jobs-cleanup-$(MEMEVER):  meme-jobs-cleanup.in
 	$(SED) $(SEDSPEC) $^ > $@
-	chmod 755 $@
 
 meme-jobs-cleanup-$(MEMEPREV):  meme-jobs-cleanup.in
 	$(SED) $(SEDSPECPREV) $^ > $@
-	chmod 755 $@
+
+meme-logs-$(MEMEVER):  meme-logs.in
+	$(SED) $(SEDSPEC) $^ > $@
+
+meme-logs-$(MEMEPREV):  meme-logs.in
+	$(SED) $(SEDSPECPREV) $^ > $@
 
 build: version.mk meme-update-db-$(MEMEVER) meme-update-db-$(MEMEPREV) \
-	meme-jobs-cleanup-$(MEMEVER) meme-jobs-cleanup-$(MEMEPREV)
+	meme-jobs-cleanup-$(MEMEVER) meme-jobs-cleanup-$(MEMEPREV) \
+	meme-logs-$(MEMEVER) meme-logs-$(MEMEPREV) 
 
 install::
 	mkdir -p $(ROOT)/etc/cron.daily 
@@ -44,9 +47,13 @@ install::
 	$(INSTALL) -m755 meme-update-db-$(MEMEPREV) $(ROOT)/etc/cron.monthly/
 	mkdir -p $(ROOT)/var/www/html/downloads
 	$(INSTALL) -m644 index.html $(ROOT)/var/www/html/downloads
+	mkdir -p $(ROOT)/etc/logrotate.d
+	$(INSTALL) -m644 meme-logs-$(MEMEVER) $(ROOT)/etc/logrotate.d/
+	$(INSTALL) -m644 meme-logs-$(MEMEPREV) $(ROOT)/etc/logrotate.d/
 
 clean::
 	rm -f $(NAME).spec.in
-	rm -rf meme-update-db-$(MEMEVER) meme-jobs-cleanup-$(MEMEVER)
-	rm -rf meme-update-db-$(MEMEPREV) meme-jobs-cleanup-$(MEMEPREV)
+	rm -rf meme-update-db-$(MEMEVER)  meme-update-db-$(MEMEPREV)
+	rm -rf meme-jobs-cleanup-$(MEMEVER) meme-jobs-cleanup-$(MEMEPREV)
+	rm -rf meme-logs-$(MEMEVER) meme-logs-$(MEMEPREV)
 	rm -rf version.mk 
