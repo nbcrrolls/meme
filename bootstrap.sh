@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: bootstrap.sh,v 1.3 2012/12/04 22:29:48 nadya Exp $
+# $Id: bootstrap.sh,v 1.4 2013/01/07 18:39:58 nadya Exp $
 #
 # Run before making a roll. 
 # Create and install (in src/RPMS) prereq perl modules rpms
@@ -52,10 +52,18 @@ rpm -i $MOD
 cp $MOD ../src/RPMS
 }
 
+doXMLParser () {
+/opt/perl/bin/cpan2dist --force --format CPANPLUS::Dist::Rocks $IGNORE XML::Parser
+MOD=`ls XML-Parser/noarch/*.rpm`
+#rpm -i $MOD
+cp $MOD ../src/RPMS
+}
+
 ### main 
 doClassStd
 doClassStdFast
 doTimeDate
 doSoapWsdl
 doHTMLTemplate
+#doXMLParser
 
