@@ -15,6 +15,9 @@
 
 	<changelog>
 	$Log: meme-server.xml.in,v $
+	Revision 1.9  2013/01/07 18:38:02  nadya
+	add dependencies perl packages
+	
 	Revision 1.8  2012/11/05 22:17:20  nadya
 	don't install meme.conf. It breaks opal.
 	
@@ -49,6 +52,10 @@
 	<package>opt-perl-Class-Std-Fast</package>
 	<package>opt-perl-SOAP-WSDL</package>
 	<package>opt-perl-TimeDate</package>
+	<package>opt-perl-XML-Parser</package>
+	<package>opt-perl-SOAP-Lite</package>
+	<package>opt-perl-Class-Inspector</package>
+	<package>opt-perl-XML-Simple</package>
 
 <post>
 
