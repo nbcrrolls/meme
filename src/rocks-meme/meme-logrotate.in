@@ -1,0 +1,16 @@
+/share/meme/LOGS-@MEMEVER@/*-log {
+    compress
+    missingok
+    notifempty
+    daily
+    rotate 31
+}
+
+/share/meme/LOGS-@MEMEPREV@/*-log {
+    compress
+    missingok
+    notifempty
+    daily
+    rotate 31
+}
+

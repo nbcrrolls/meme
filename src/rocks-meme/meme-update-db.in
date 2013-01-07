@@ -14,7 +14,7 @@ OPTS="-upstream -noclobber"
 
 date > $LOG
 if [ -x $UPDATEDB ] ; then
-    $UPDATEDB $OPTS >> $LOG
+    $UPDATEDB $OPTS >> $LOG 2>&1
 fi
 
 # mail log file
