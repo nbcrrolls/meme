@@ -1,9 +1,12 @@
-# $Id: Makefile,v 1.9 2012/11/03 00:47:44 nadya Exp $
+# $Id: Makefile,v 1.10 2013/01/07 22:50:23 nadya Exp $
 #
 # @Copyright@
 # @Copyright@
 #
 # $Log: Makefile,v $
+# Revision 1.10  2013/01/07 22:50:23  nadya
+# move making directories to server only
+#
 # Revision 1.9  2012/11/03 00:47:44  nadya
 # clean old meme distro.
 #
@@ -35,6 +38,7 @@
 PKGROOT = /opt/$(NAME)_$(MEMEVER)
 PKGROOT_OUT = output-$(MEMEVER)
 PKGROOT_USER = user-files-$(MEMEVER)
+PKGROOT_LOGS = LOGS-$(MEMEVER)
 
 REDHAT.ROOT = $(CURDIR)/../../
 
@@ -106,15 +110,14 @@ install::
 	ln -s /share/meme/db/gomo_databases $(ROOT)/$(PKGROOT)/db
 	ln -s /share/meme/db/fasta_databases $(ROOT)/$(PKGROOT)/db
 
-	mkdir -p $(ROOT)/state/partition1/meme/$(PKGROOT_OUT)
-	chmod 777 $(ROOT)/state/partition1/meme/$(PKGROOT_OUT)
 	rm -rf $(ROOT)/$(PKGROOT)/web/output
 	ln -s /share/meme/$(PKGROOT_OUT) $(ROOT)/$(PKGROOT)/web/output
 
-	mkdir -p $(ROOT)/state/partition1/meme/$(PKGROOT_USER)
-	chmod 777 $(ROOT)/state/partition1/meme/$(PKGROOT_USER)
 	rm -rf $(ROOT)/$(PKGROOT)/web/user-files
 	ln -s /share/meme/$(PKGROOT_USER) $(ROOT)/$(PKGROOT)/web/user-files
+
+	rm -rf $(ROOT)/$(PKGROOT)/LOGS
+	ln -s /share/meme/$(PKGROOT_LOGS) $(ROOT)/$(PKGROOT)/LOGS
 
 clean::
 	rm -rf version.mk

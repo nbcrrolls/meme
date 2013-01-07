@@ -1,9 +1,12 @@
-# $Id: Makefile,v 1.1 2012/11/03 00:51:19 nadya Exp $
+# $Id: Makefile,v 1.2 2013/01/07 22:50:24 nadya Exp $
 #
 # @Copyright@
 # @Copyright@
 #
 # $Log: Makefile,v $
+# Revision 1.2  2013/01/07 22:50:24  nadya
+# move making directories to server only
+#
 # Revision 1.1  2012/11/03 00:51:19  nadya
 # make separate rpm for previous version
 #
@@ -11,6 +14,7 @@
 PKGROOT = /opt/$(PKGNAME)_$(MEMEPREV)
 PKGROOT_OUT = output-$(MEMEPREV)
 PKGROOT_USER = user-files-$(MEMEPREV)
+PKGROOT_LOGS = LOGS-$(MEMEPREV)
 
 REDHAT.ROOT = $(CURDIR)/../../
 
@@ -82,15 +86,15 @@ install::
 	ln -s /share/meme/db/gomo_databases $(ROOT)/$(PKGROOT)/db
 	ln -s /share/meme/db/fasta_databases $(ROOT)/$(PKGROOT)/db
 
-	mkdir -p $(ROOT)/state/partition1/meme/$(PKGROOT_OUT)
-	chmod 777 $(ROOT)/state/partition1/meme/$(PKGROOT_OUT)
 	rm -rf $(ROOT)/$(PKGROOT)/web/output
 	ln -s /share/meme/$(PKGROOT_OUT) $(ROOT)/$(PKGROOT)/web/output
 
-	mkdir -p $(ROOT)/state/partition1/meme/$(PKGROOT_USER)
-	chmod 777 $(ROOT)/state/partition1/meme/$(PKGROOT_USER)
 	rm -rf $(ROOT)/$(PKGROOT)/web/user-files
 	ln -s /share/meme/$(PKGROOT_USER) $(ROOT)/$(PKGROOT)/web/user-files
+
+	rm -rf $(ROOT)/$(PKGROOT)/LOGS
+	ln -s /share/meme/$(PKGROOT_LOGS) $(ROOT)/$(PKGROOT)/LOGS
+
 
 clean::
 	rm -rf version.mk update-csv.sh*  
