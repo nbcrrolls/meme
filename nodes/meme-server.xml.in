@@ -15,6 +15,9 @@
 
 	<changelog>
 	$Log: meme-server.xml.in,v $
+	Revision 1.10  2013/01/07 22:49:09  nadya
+	move making links/dirs to a script
+	
 	Revision 1.9  2013/01/07 18:38:02  nadya
 	add dependencies perl packages
 	
@@ -59,19 +62,10 @@
 
 <post>
 
-<!-- make links for web CGI access -->
-if [ -e /var/www/html/meme ] ; then
-   rm -rf /var/www/html/meme
-fi
-ln -s /opt/meme_MEMEVER/web /var/www/html/meme_MEMEVER
-ln -s /opt/meme_MEMEVER/web /var/www/html/meme
 
-if [ ! -e /var/www/html/meme_MEMEPREV ] ; then
-    ln -s /opt/meme_MEMEPREV/web /var/www/html/meme_MEMEPREV
-fi
+<!-- create needed web CGI links and NFS-shared directories -->
+/opt/meme_MEMEVER/rocks/meme-rocks.sh
 
-
-<!-- mounting NFS-shared directory for meme db and output -->
 <file name="/etc/auto.share" mode="append">
 meme &Kickstart_PrivateHostname;:/export/&amp;
 </file>
