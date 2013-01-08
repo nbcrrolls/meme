@@ -1,9 +1,12 @@
-# $Id: Makefile,v 1.10 2013/01/07 22:50:23 nadya Exp $
+# $Id: Makefile,v 1.11 2013/01/08 01:26:09 nadya Exp $
 #
 # @Copyright@
 # @Copyright@
 #
 # $Log: Makefile,v $
+# Revision 1.11  2013/01/08 01:26:09  nadya
+# patching of etc files was added via meme patch 3
+#
 # Revision 1.10  2013/01/07 22:50:23  nadya
 # move making directories to server only
 #
@@ -69,7 +72,7 @@ update-csv-bootstrap.sh: update-csv.sh
 
 build: version.mk update-csv.sh update-csv-bootstrap.sh
 	gunzip -c $(NAME)_$(MEMEVER).$(TARBALL_POSTFIX) | $(TAR) -xf -
-	cd patch-files && find . -type f | grep -v CVS | cpio -pduv ..
+	#cd patch-files && find . -type f | grep -v CVS | cpio -pduv ..
 
 	(							      \
 		cd $(NAME)_$(MEMEVER);				      \
