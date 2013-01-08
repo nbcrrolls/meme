@@ -6,6 +6,7 @@ REDHAT.ROOT = $(CURDIR)/../../
 -include $(ROCKSROOT)/etc/Rules.mk
 include Rules.mk
 
+PKGROOT = /opt/meme_$(MEMEVER)/rocks
 
 SEDSPEC += \
         -e 's%@MEMEVER@%$(MEMEVER)%g' \
@@ -29,18 +30,15 @@ meme-rocks.sh:  meme-rocks.sh.in
 build: version.mk meme-update-db meme-jobs-cleanup \
 	meme-logrotate meme-rocks.sh 
 
-PKGROOT = /opt/$(NAME)_$(MEMEVER)/rocks
 
 install::
 	mkdir -p $(ROOT)/etc/cron.daily 
 	$(INSTALL) -m755 meme-jobs-cleanup $(ROOT)/etc/cron.daily/
 	mkdir -p $(ROOT)/etc/cron.monthly 
 	$(INSTALL) -m755 meme-update-db $(ROOT)/etc/cron.monthly/
-	mkdir -p $(ROOT)/var/www/html/downloads
-	$(INSTALL) -m644 index.html $(ROOT)/var/www/html/downloads
-	mkdir -p $(ROOT)/opt/meme_$(MEMEVER)/rocks
-	$(INSTALL) -m644 meme-logrotate $(ROOT)/opt/$(NAME)_$(MEMEVER)/rocks
-	$(INSTALL) -m755 meme-rocks.sh $(ROOT)/opt/$(NAME)_$(MEMEVER)/rocks
+	mkdir -p $(ROOT)/$(PKGROOT)
+	$(INSTALL) -m644 meme-logrotate $(ROOT)/$(PKGROOT)
+	$(INSTALL) -m755 meme-rocks.sh $(ROOT)/$(PKGROOT)
 
 clean::
 	rm -f $(NAME).spec.in version.mk

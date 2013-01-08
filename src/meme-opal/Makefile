@@ -1,9 +1,12 @@
-# $Id: Makefile,v 1.7 2012/12/05 22:48:20 nadya Exp $
+# $Id: Makefile,v 1.8 2013/01/08 01:26:59 nadya Exp $
 #
 # @Copyright@
 # @Copyright@
 #
 # $Log: Makefile,v $
+# Revision 1.8  2013/01/08 01:26:59  nadya
+# move action to opal-server node
+#
 # Revision 1.7  2012/12/05 22:48:20  nadya
 # enable cgi listing; rocks.conf on opal-server is minimal
 #
@@ -60,7 +63,8 @@ install::
 	$(INSTALL)  -m 0755  *deploy_meme_$(MEMEPREV).sh  $(ROOT)/$(PKGROOT)
 	mkdir -p $(ROOT)/etc/httpd/conf.d
 	install -m 644 meme.conf $(ROOT)/etc/httpd/conf.d
-
+	mkdir -p $(ROOT)/var/www/html/downloads
+	$(INSTALL) -m644 index.html $(ROOT)/var/www/html/downloads
 
 clean::
 	rm -rf version.mk *deploy_meme_*.sh
