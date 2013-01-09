@@ -1,0 +1,20 @@
+#!/bin/bash
+
+# NFS-shared directories for meme output, logs, and user temp files
+BASE=/state/partition1/meme/
+mkdir -p $BASE
+
+# meme output
+mkdir -p $BASE/output-@MEMEVER@
+mkdir -p $BASE/output-@MEMEPREV@
+chown tomcat:tomcat $BASE/output-*
+
+# temp user files 
+mkdir -p $BASE/user-files-@MEMEVER@
+mkdir -p $BASE/user-files-@MEMEPREV@
+chown tomcat:tomcat  $BASE/user-files-*
+
+# usage logs 
+mkdir -p $BASE/LOGS-@MEMEVER@
+mkdir -p $BASE/LOGS-@MEMEPREV@
+chown tomcat:tomcat  $BASE/LOGS-*

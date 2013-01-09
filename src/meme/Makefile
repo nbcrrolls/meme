@@ -1,9 +1,13 @@
-# $Id: Makefile,v 1.11 2013/01/08 01:26:09 nadya Exp $
+# $Id: Makefile,v 1.12 2013/01/09 22:36:14 nadya Exp $
 #
 # @Copyright@
 # @Copyright@
 #
 # $Log: Makefile,v $
+# Revision 1.12  2013/01/09 22:36:14  nadya
+# do cgi links on opal server
+# do mkdir on /export on frontend
+#
 # Revision 1.11  2013/01/08 01:26:09  nadya
 # patching of etc files was added via meme patch 3
 #
@@ -54,6 +58,7 @@ version.mk:
 
 SEDSPEC += \
         -e 's%@MEMEVER@%$(MEMEVER)%g' \
+        -e 's%@MEMEPREV@%$(MEMEPREV)%g' \
         -e 's%@NAME@%$(NAME)%g' 
 
 SEDSPECBOOTSTRAP += \
@@ -68,6 +73,10 @@ update-csv.sh: update-csv.sh.in
 
 update-csv-bootstrap.sh: update-csv.sh
 	$(SED) $(SEDSPECBOOTSTRAP) $^ > $@
+	chmod 755 $@
+
+meme-www.sh: meme-www.sh.in
+	$(SED) $(SEDSPEC) $^ > $@
 	chmod 755 $@
 
 build: version.mk update-csv.sh update-csv-bootstrap.sh
@@ -107,6 +116,8 @@ install::
 	)
 	mkdir -p $(ROOT)/$(PKGROOT)/bin
 	$(INSTALL) -m755  update-csv.sh  $(ROOT)/$(PKGROOT)/bin
+	mkdir -p $(ROOT)/$(PKGROOT)/rocks
+	$(INSTALL) -m755  meme-www.sh  $(ROOT)/$(PKGROOT)/rocks
 	mkdir -p $(ROOT)/$(PKGROOT)/lib/perl
 	cp -r $(RSATWS) $(ROOT)/$(PKGROOT)/lib/perl
 	ln -s /share/meme/db/motif_databases $(ROOT)/$(PKGROOT)/db
@@ -124,5 +135,5 @@ install::
 
 clean::
 	rm -rf version.mk
-	rm -rf update-csv.sh update-csv-bootstrap.sh
+	rm -rf update-csv.sh update-csv-bootstrap.sh meme-www.sh
 	rm -rf $(NAME)_$(MEMEVER) $(RSATWS)  $(NAME)_$(MEMEPREV)
