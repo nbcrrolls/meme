@@ -16,21 +16,40 @@
 
 	<changelog>
 	$Log: meme.xml,v $
+	Revision 1.2  2013/01/09 22:43:27  nadya
+	add order
+	
 	Revision 1.1  2012/06/30 02:11:10  nadya
 	initial
 	
 	</changelog>
 
-        <edge from="server" to="meme-server"/>
-        <edge from="server" to="meme-common"/>
+        <edge from="server">
+            <to>meme-common</to>
+            <to>meme-server</to>
+            <to>meme-opal</to>
+	</edge>
+
         <edge from="client" to="meme-common"/>
 
         <!-- opal deployment -->
         <edge from="client" to="meme-opal" cond="opal_server"/>
-        <edge from="server" to="meme-opal"/>
 
+        <!-- opal must be installed -->
         <order head="opal-common">
                 <tail>meme-opal</tail>
         </order>
 
+        <!-- first install common stuff -->
+        <order head="meme-common">
+                <tail>meme-opal</tail>
+        </order>
+        <order head="meme-common">
+                <tail>meme-server</tail>
+        </order>
+
+        <!-- server stuff before opal related -->
+        <order head="meme-server">
+                <tail>meme-opal</tail>
+        </order>
 </graph>
