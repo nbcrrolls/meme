@@ -12,6 +12,9 @@ UPDATEDB=/opt/meme_@MEMEVER@/bin/update_db
 LOG=/tmp/meme-update-db.log
 OPTS="-upstream -noclobber"
 
+# mount nfs partition with fasta databases
+ls /opt/meme_@MEMEVER@/db/fasta_databases/ > /dev/null
+
 date > $LOG
 if [ -x $UPDATEDB ] ; then
     $UPDATEDB $OPTS >> $LOG 2>&1
@@ -21,10 +24,11 @@ fi
 MSG=/tmp/meme-message
 ATTACH=meme-update-db-`date +%Y-%m-%d`.log.gz
 TO=meme@nbcr.net
+HOST=`hostname`
 
 cat $LOG | gzip > $ATTACH
 echo "Update DB log file, run on `date +%Y-%m-%d ` " > $MSG
-mailx -r meme@rollhost -s "meme db update on rollhost" -a $ATTACH $TO < $MSG
+mailx -r meme@$HOST -s "meme db update on $HOST" -a $ATTACH $TO < $MSG
 
 rm -rf $MSG $ATTACH
 
