@@ -6,7 +6,7 @@ REDHAT.ROOT = $(CURDIR)/../../
 -include $(ROCKSROOT)/etc/Rules.mk
 include Rules.mk
 
-PKGROOT = /opt/meme/rocks
+PKGROOT = /opt/meme_$(MEMEVER)/rocks
 
 SEDSPEC += \
         -e 's%@MEMEVER@%$(MEMEVER)%g' \
