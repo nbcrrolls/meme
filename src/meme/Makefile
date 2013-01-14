@@ -1,9 +1,12 @@
-# $Id: Makefile,v 1.12 2013/01/09 22:36:14 nadya Exp $
+# $Id: Makefile,v 1.13 2013/01/14 22:15:26 nadya Exp $
 #
 # @Copyright@
 # @Copyright@
 #
 # $Log: Makefile,v $
+# Revision 1.13  2013/01/14 22:15:26  nadya
+# correct xmls are in meme distro now
+#
 # Revision 1.12  2013/01/09 22:36:14  nadya
 # do cgi links on opal server
 # do mkdir on /export on frontend
@@ -79,9 +82,9 @@ meme-www.sh: meme-www.sh.in
 	$(SED) $(SEDSPEC) $^ > $@
 	chmod 755 $@
 
-build: version.mk update-csv.sh update-csv-bootstrap.sh
+build: version.mk update-csv.sh update-csv-bootstrap.sh meme-www.sh
 	gunzip -c $(NAME)_$(MEMEVER).$(TARBALL_POSTFIX) | $(TAR) -xf -
-	#cd patch-files && find . -type f | grep -v CVS | cpio -pduv ..
+	cd patch-files && find . -type f | grep -v CVS | cpio -pduv ..
 
 	(							      \
 		cd $(NAME)_$(MEMEVER);				      \
