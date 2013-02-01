@@ -1,9 +1,12 @@
-# $Id: Makefile,v 1.13 2013/01/14 22:15:26 nadya Exp $
+# $Id: Makefile,v 1.14 2013/02/01 16:57:16 nadya Exp $
 #
 # @Copyright@
 # @Copyright@
 #
 # $Log: Makefile,v $
+# Revision 1.14  2013/02/01 16:57:16  nadya
+# rm user-files/
+#
 # Revision 1.13  2013/01/14 22:15:26  nadya
 # correct xmls are in meme distro now
 #
@@ -47,7 +50,6 @@
 
 PKGROOT = /opt/$(NAME)_$(MEMEVER)
 PKGROOT_OUT = output-$(MEMEVER)
-PKGROOT_USER = user-files-$(MEMEVER)
 PKGROOT_LOGS = LOGS-$(MEMEVER)
 
 REDHAT.ROOT = $(CURDIR)/../../
@@ -131,7 +133,6 @@ install::
 	ln -s /share/meme/$(PKGROOT_OUT) $(ROOT)/$(PKGROOT)/web/output
 
 	rm -rf $(ROOT)/$(PKGROOT)/web/user-files
-	ln -s /share/meme/$(PKGROOT_USER) $(ROOT)/$(PKGROOT)/web/user-files
 
 	rm -rf $(ROOT)/$(PKGROOT)/LOGS
 	ln -s /share/meme/$(PKGROOT_LOGS) $(ROOT)/$(PKGROOT)/LOGS

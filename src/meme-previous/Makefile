@@ -1,9 +1,12 @@
-# $Id: Makefile,v 1.2 2013/01/07 22:50:24 nadya Exp $
+# $Id: Makefile,v 1.3 2013/02/01 16:57:16 nadya Exp $
 #
 # @Copyright@
 # @Copyright@
 #
 # $Log: Makefile,v $
+# Revision 1.3  2013/02/01 16:57:16  nadya
+# rm user-files/
+#
 # Revision 1.2  2013/01/07 22:50:24  nadya
 # move making directories to server only
 #
@@ -13,7 +16,6 @@
 
 PKGROOT = /opt/$(PKGNAME)_$(MEMEPREV)
 PKGROOT_OUT = output-$(MEMEPREV)
-PKGROOT_USER = user-files-$(MEMEPREV)
 PKGROOT_LOGS = LOGS-$(MEMEPREV)
 
 REDHAT.ROOT = $(CURDIR)/../../
@@ -90,7 +92,6 @@ install::
 	ln -s /share/meme/$(PKGROOT_OUT) $(ROOT)/$(PKGROOT)/web/output
 
 	rm -rf $(ROOT)/$(PKGROOT)/web/user-files
-	ln -s /share/meme/$(PKGROOT_USER) $(ROOT)/$(PKGROOT)/web/user-files
 
 	rm -rf $(ROOT)/$(PKGROOT)/LOGS
 	ln -s /share/meme/$(PKGROOT_LOGS) $(ROOT)/$(PKGROOT)/LOGS

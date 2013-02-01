@@ -8,13 +8,10 @@ mkdir -p $BASE
 mkdir -p $BASE/output-@MEMEVER@
 mkdir -p $BASE/output-@MEMEPREV@
 chown tomcat:tomcat $BASE/output-*
-
-# temp user files 
-mkdir -p $BASE/user-files-@MEMEVER@
-mkdir -p $BASE/user-files-@MEMEPREV@
-chown tomcat:tomcat  $BASE/user-files-*
+chmod 777 $BASE/output-*
 
 # usage logs 
 mkdir -p $BASE/LOGS-@MEMEVER@
 mkdir -p $BASE/LOGS-@MEMEPREV@
 chown tomcat:tomcat  $BASE/LOGS-*
+chmod 777 $BASE/LOGS-*
