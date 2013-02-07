@@ -14,7 +14,9 @@ JASPAR_CORE_2009.meme uniprobe_mouse.meme,no,yes,yes,JASPAR and UniPROBE,Searche
 
 JASPAR_CORE_2009_vertebrates.meme uniprobe_mouse.meme,no,yes,yes,All Vertebrates,Searches JASPAR CORE vertebrates and Mouse (UniPROBE).
 
-flyreg.v2.meme idmmpmm2009.meme dmmpmm2009.meme,no,yes,yes,All Drosophila,Searches FLYREG&#44; iDMMPMM and DMMPMM.
+jolma2013.meme,no,yes,yes,Human and Mouse (Jolma2013),Human and Mouse high-throughput SELEX motifs from <a href="http://dx.doi.org/10.1116/j.cell.2012.12.009"> Cell 213. 152(1-2):327-339</a>.
+
+fly_factor_survey.meme flyreg.v2.meme idmmpmm2009.meme dmmpmm2009.meme,no,yes,yes,All Drosophila,Searches Fly Factor Survey&#44; FLYREG&#44; iDMMPMM and DMMPMM.
 
 scpd_matrix.meme macisaac_yeast.v1.meme,no,yes,yes,All Yeast,Searches SCPD and MacIsaac v1.
 
@@ -53,6 +55,8 @@ prodoric.meme,no,yes,yes,Prokaryotes (Prodoric Release 8.9),Prokaryotic motifs f
 regtransbase.meme,no,yes,yes,Prokaryotes (RegTransBase v4),Manually curated prokaryotic motifs from <a href="http://regtransbase.lbl.gov/cgi-bin/regtransbase">RegTransBase</a>; downloaded from <a href="http://regtransbase.lbl.gov/cgi-bin/regtransbase?page=downloads">http://regtransbase.lbl.gov/cgi-bin/regtransbase?page=downloads</a>
 
 #transfac_matrix.meme,no,yes,yes,TRANSFAC,The <a href="http://biobase-international.com/pages/index.php?id=transfacdatabases">TRANSFAC</a> transcription factor motifs; contains redundant motifs.
+
+fly_factor_survey.meme,no,yes,yes,Drosophila (Fly Factor Survey),The FlyFactorSurvey database summarizes a project using the bacterial one-hybrid method to systematically describe the binding site preferences of transcription factors in Drosophila melanogaster. This effort is a collaboration between the laboratories of Michael Brodsky and Scot Wolfe at the University of Massachusetts Medical School and has been funded by the National Human Genome Research Institute. <a href="http://pgfe.umassmed.edu/TFDBS">http://pgfe.umassmed.edu/TFDBS</a>.
 
 flyreg.v2.meme,no,yes,yes,Drosophila (FLYREG; Bergman & Pollard v2),Based on <a href="http://www.flyreg.org">FlyReg Drosophila DNase I Footprint Database (v2.0)</a>; downloaded from <a href="http://www.danielpollard.com/matrices.html">http://www.danielpollard.com/matrices.html</a>.
 
