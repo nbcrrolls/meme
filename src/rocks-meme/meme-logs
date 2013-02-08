@@ -1,0 +1,64 @@
+#!/bin/bash
+
+### define functions
+usage () {
+    # show usage
+    echo "NBCR specific:"
+    echo "    Save meme logs daily per application and per version."
+    echo "    Scp to bailey account."
+    echo "    Run from cron"
+}
+
+setDefaults () {
+    # logs source 
+    BASEDIR=/share/meme
+    VERSIONS=`ls /share/meme | grep LOGS`
+
+    # logs archive 
+    DEST=/share/backup/meme_logs
+
+    # logs destination 
+    HOST="169.228.41.199"
+    USER="tbailey"
+
+    # last month timestamp
+    #LABEL=`date --date="last month" +%Y-%m`
+
+    # yesterday's  time stamp
+    LABEL=`date --date="yesterday" +%Y%m%d`
+
+    ls $DEST > /dev/null
+    if [ ! -d $DEST ] ; then
+        mkdir $DEST
+    fi
+}
+
+saveLogs () {
+    # move logs to archive dir and scp a copy for meme team 
+    SPOOL=$BASEDIR/$1
+    FILES="centrimo dreme fimo glam2 glam2scan gomo mast mcast meme memechip spamo tomtom"
+
+    for name in $FILES ;
+    do
+        if [ -f $SPOOL/$name-log.1.gz ] ; then
+            mv $SPOOL/$name-log.1.gz $DEST/$i-$name-$LABEL.gz
+            echo "Saved to $DEST/$i-$name-$LABEL.gz"
+            scp $DEST/$i-$name-$LABEL.gz $USER@$HOST:LOGS/
+        fi
+    done
+
+}
+
+
+### start
+if test $# = 1; then
+    usage
+else
+    setDefaults
+    /usr/sbin/logrotate -f /opt/meme/rocks/meme-logrotate
+    for i in $VERSIONS ;
+    do
+        saveLogs $i
+    done
+fi
+

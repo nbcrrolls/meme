@@ -1,5 +1,5 @@
-When updating to a NEW version versionX:
-
+When updating to a NEW versionX (in src/meme/):
+-----------------------------------------------
 1 Update gomo_db.csv and motif_db.csv:
   extract them from <roll/src/meme-db/*.tgz files and put in ./patch-files/versionX/etc
   for each meme version.  These allows for creation of index files during compile step.
@@ -11,12 +11,16 @@ When updating to a NEW version versionX:
    make targets install-data-hook and uninstall-hook empty (opal service deploy related)
 
 4 meme-previous/Makefile is based on meme/Makefile. 
-  If meme/Makefile changes, the other file may need modification.
+  If meme/Makefile changes, this file needs modification.
 
-
-When updating meme DBs (in meme-db/) :
-
+When updating meme DBs (in src/meme-db/) :
+-----------------------------------------------
 download from http://ebi.edu.au/ftp/software/MEME/index.html
 gomo_databases.tgz  - corresponds to gomo_databases.3.tgz  (updated Jun 18 2010) 
 motif_databases.tgz - corresponds to motif_databases.9.tgz (updated Jan 31 2013)
 
+File src/rocks-meme/meme-logs
+-----------------------------------------------
+don't make it a part of the distro, too NBCR specific.
+Update when needed and drop in manually in /etc/cron.daily/ 
+on the frontend of the opal-server host. 
