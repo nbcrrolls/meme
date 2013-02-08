@@ -1,9 +1,12 @@
-# $Id: Makefile,v 1.8 2013/01/08 01:26:59 nadya Exp $
+# $Id: Makefile,v 1.9 2013/02/08 00:51:16 nadya Exp $
 #
 # @Copyright@
 # @Copyright@
 #
 # $Log: Makefile,v $
+# Revision 1.9  2013/02/08 00:51:16  nadya
+# mv cron jobs from rocks-meme to meme-opal
+#
 # Revision 1.8  2013/01/08 01:26:59  nadya
 # move action to opal-server node
 #
@@ -35,13 +38,20 @@ REDHAT.ROOT = $(CURDIR)/../../
 include Rules.mk
 
 SEDSPEC += \
-        -e 's%@MEMEVER@%$(MEMEVER)%g' 
+        -e 's%@MEMEVER@%$(MEMEVER)%g' \
+        -e 's%@MEMEPREV@%$(MEMEPREV)%g' 
 
 SEDSPECPREV += \
             -e 's%@MEMEVER@%$(MEMEPREV)%g' 
 
 version.mk:
 	cat version.mk.in ../version.mk > version.mk
+
+meme-update-db:  meme-update-db.in
+	$(SED) $(SEDSPEC) $^ > $@
+
+meme-jobs-cleanup:  meme-jobs-cleanup.in
+	$(SED) $(SEDSPEC) $^ > $@
 
 deploy_meme_$(MEMEVER).sh: deploy_meme.sh.in
 	$(SED) $(SEDSPEC) $^ > $@
@@ -55,7 +65,9 @@ undeploy_meme_$(MEMEVER).sh: undeploy_meme.sh.in
 undeploy_meme_$(MEMEPREV).sh: undeploy_meme.sh.in
 	$(SED) $(SEDSPECPREV) $^ > $@
 
-build: deploy_meme_$(MEMEVER).sh deploy_meme_$(MEMEPREV).sh undeploy_meme_$(MEMEVER).sh undeploy_meme_$(MEMEPREV).sh
+build:  deploy_meme_$(MEMEVER).sh deploy_meme_$(MEMEPREV).sh \
+	undeploy_meme_$(MEMEVER).sh undeploy_meme_$(MEMEPREV).sh \
+	meme-update-db meme-jobs-cleanup
 	
 install::
 	mkdir -p $(ROOT)/$(PKGROOT)
@@ -65,6 +77,11 @@ install::
 	install -m 644 meme.conf $(ROOT)/etc/httpd/conf.d
 	mkdir -p $(ROOT)/var/www/html/downloads
 	$(INSTALL) -m644 index.html $(ROOT)/var/www/html/downloads
+	mkdir -p $(ROOT)/etc/cron.daily 
+	$(INSTALL) -m755 meme-jobs-cleanup $(ROOT)/etc/cron.daily/
+	mkdir -p $(ROOT)/etc/cron.monthly 
+	$(INSTALL) -m755 meme-update-db $(ROOT)/etc/cron.monthly/
 
 clean::
 	rm -rf version.mk *deploy_meme_*.sh
+	rm -rf meme-update-db meme-jobs-cleanup 

@@ -24,7 +24,7 @@ fi
 MSG=/tmp/meme-message
 ATTACH=meme-update-db-`date +%Y-%m-%d`.log.gz
 TO=meme@nbcr.net
-HOST=`hostname`
+HOST=`rocks list host attr localhost | grep opal_public_fqdn | awk '{print $3}'`
 
 cat $LOG | gzip > $ATTACH
 echo "Update DB log file, run on `date +%Y-%m-%d ` " > $MSG

@@ -15,6 +15,9 @@
 
 	<changelog>
 	$Log: meme-server.xml.in,v $
+	Revision 1.12  2013/02/08 00:51:16  nadya
+	mv cron jobs from rocks-meme to meme-opal
+	
 	Revision 1.11  2013/01/08 02:37:58  nadya
 	move link/dir creation to scripts
 	
@@ -69,11 +72,6 @@
 <!-- create needed NFS-shared directories on frontend -->
 if [ -f /opt/meme/rocks/meme-nfs.sh ] ; then
     /opt/meme/rocks/meme-nfs.sh
-fi
-
-<!-- create needed web CGI links on opal server node -->
-if [ -f /opt/meme/rocks/meme-www.sh ] ; then
-    /opt/meme/rocks/meme-www.sh
 fi
 
 <file name="/etc/auto.share" mode="append">
