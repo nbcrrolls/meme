@@ -35,7 +35,7 @@ version.mk:
 
 build: version.mk 
 	tar xvf $(GOMO).$(TARBALL_POSTFIX)
-	tar xvf $(MOTIF).$(MOTIF_VERSION).tar.gz
+	tar xvf $(MOTIF).$(MOTIF_VERSION).$(TARBALL_POSTFIX)
 
 	
 install::
