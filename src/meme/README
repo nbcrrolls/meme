@@ -1,26 +1,37 @@
-When updating to a NEW versionX (in src/meme/):
------------------------------------------------
-1 Update gomo_db.csv and motif_db.csv:
-  extract them from <roll/src/meme-db/*.tgz files and put in ./patch-files/versionX/etc
-  for each meme version.  These allows for creation of index files during compile step.
-  When updateing gomo or motif databases distros update these files. 
+1 script ../ bootstrap.sh (in the roll base dir)
+  Run before making a roll.  Make sure specified rpms are installed.
+  Need them during meme build for creating db csv files. 
 
-2. update 2 versions in src/version.mk (new and previous)
+2 When updating to a NEW versionX (in src/meme/):
+  2.1 Update gomo_db.csv and motif_db.csv: extract them from meme/src/meme-db/*.tgz files and put in 
+         src/meme/patch-files/versionX/etc
+         src/meme-previous/patch-files/versionX/etc
+      These allows for creation of index files during compile step.
+      When updateing gomo or motif databases distros update these patch files. 
 
-3. mkdir patch-files/versionX/etc/ and add patched Makefile.in 
-   make targets install-data-hook and uninstall-hook empty (opal service deploy related)
+  2.2 Update both versions in src/version.mk (new and previous)
 
-4 meme-previous/Makefile is based on meme/Makefile. 
-  If meme/Makefile changes, this file needs modification.
+  2.3 mkdir meme/patch-files/versionX/etc/ and add patched Makefile.in 
+      Patching: make targets install-data-hook and uninstall-hook empty (related to opal service deploy)
 
-When updating meme DBs (in src/meme-db/) :
------------------------------------------------
-download from http://ebi.edu.au/ftp/software/MEME/index.html
-gomo_databases.tgz  - corresponds to gomo_databases.3.tgz  (updated Jun 18 2010) 
-motif_databases.tgz - corresponds to motif_databases.9.tgz (updated Jan 31 2013)
+  2.4 meme-previous/Makefile is based on meme/Makefile. 
+      If meme/Makefile changes, this file needs modification.
 
-File src/rocks-meme/meme-logs
------------------------------------------------
-don't make it a part of the distro, too NBCR specific.
-Update when needed and drop in manually in /etc/cron.daily/ 
-on the frontend of the opal-server host. 
+3 When updating meme DBs (in src/meme-db/):
+  download from http://ebi.edu.au/ftp/software/MEME/index.html
+    gomo_databases.tgz  - corresponds to gomo_databases.3.tgz  (updated Jun 18 2010) 
+    motif_databases.tgz - corresponds to motif_databases.9.tgz (updated Jan 31 2013)
+
+4 File src/rocks-meme/meme-logs
+  don't make it a part of the distro, too NBCR specific.
+  Update when needed and drop in manually in /etc/cron.daily on the frontend.
+
+5 For patch fasta-get-markov.patch for meme 4.9.0
+  patch added 2013-06-12
+  add  to meme/Makefile lines (before configure)
+     aclocal;                      \
+     autoreconf --force --install; \  
+
+  since this patch changes Makefil.am files and new
+  Makefile.in and autoconf-related tools have to be generated anew. 
+  Remove these lines when patches are incorporated in next meme version.
