@@ -15,8 +15,12 @@ SEDSPEC += \
 	-e 's%@MEMEPREV@%$(MEMEPREV)%g' \
 	-e 's%@ROCKS_VERSION@%$(ROCKS_VERSION)%g' 
 
-version.mk:
+version.mk: 
 	cat version.mk.in ../version.mk > version.mk
+	if [ ! -d ./images ]; then \
+	    mkdir -p ./images ; \
+	fi
+
 
 default: $(NAME).spec 
 
@@ -50,5 +54,5 @@ install:: build
 clean::
 	rm -f index.pdf
 	rm -rf *.html
-	rm -rf images/*.png version.mk
+	rm -rf images version.mk
 	rm -rf after-install.sgml preface.sgml requirements.sgml
