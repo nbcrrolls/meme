@@ -53,10 +53,18 @@ rpm -i $MOD
 cp $MOD ../src/RPMS
 }
 
+doFTPAutoReconnect () {
+/opt/perl/bin/cpan2dist --force --format CPANPLUS::Dist::Rocks $IGNORE Net::FTP::AutoReconnect
+MOD=`ls Net-FTP-AutoReconnect/noarch/*.rpm`
+rpm -i $MOD
+cp $MOD ../src/RPMS
+}
+
 ### main 
 doClassStd
 doClassStdFast
 doTimeDate
 doSoapWsdl
 doHTMLTemplate
+doFTPAutoReconnect
 
