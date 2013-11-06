@@ -23,3 +23,7 @@
 ^Apache2::RequestIO$
 ^Apache2::RequestRec$
 ^Apache2::RequestUtil$
+^ExtUtils::CBuilder$
+^ExtUtils::Constant$
+^Socket$
+^libnet$
