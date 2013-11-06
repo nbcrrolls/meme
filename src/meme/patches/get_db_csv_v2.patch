@@ -1,0 +1,71 @@
+diff -r e5831abe03b9 -r adb74770ad56 scripts/get_db_csv.pl.in
+--- a/scripts/get_db_csv.pl.in	Mon Jun 17 09:13:12 2013 +1000
++++ b/scripts/get_db_csv.pl.in	Thu Jun 20 13:43:29 2013 +1000
+@@ -9,7 +9,7 @@
+ use File::Find;
+ use Net::FTP;
+ use File::Basename;
+-use Net::FTP;
++use Net::FTP::AutoReconnect;
+ use SOAP::WSDL;
+ use lib $ENV{'RSATWS'};
+ use MyInterfaces::RSATWebServices::RSATWSPortType;
+@@ -125,7 +125,7 @@
+ 
+ if ($db ne "UPSTREAM") {		# use ftp
+   # Connnect to source FTP server
+-  my $ftp = Net::FTP->new($host, Timeout=>6000, Debug=>0, Passive=>1);
++  my $ftp = Net::FTP::AutoReconnect->new($host, Timeout=>120, Debug=>0, Passive=>1);
+   if (! $ftp) {
+     $error_status = 1;
+     $message = "Unable to connect to $host.";
+@@ -152,7 +152,15 @@
+ 	$message = "Unable to cd to $path on $host.";
+       }
+     }
+-    my @name_list = $ftp->ls();
++    my @name_list = do {
++      local $@;
++      my @ret;
++      unless (eval {@ret = $ftp->ls(); 1}) {
++        warn("Failure of \$ftp->ls() when cwd is $path on $host: $@\n");   
++        $ftp->reconnect();
++      }
++      @ret;
++    };
+     print "$header\n";
+     print ",$prot,$nuc,$short_only,-----$db $class $title1-----,,,,\n";
+     foreach $_ (sort @name_list) {
+@@ -162,14 +170,30 @@
+       $id .= $suffix;
+       if ($nuc eq "no") {
+         # check that peptide file exists
+-        my @result = $ftp->ls("$_/$pep_template");
++        my @result = do {
++          local $@;
++          my @ret;
++          unless (eval {@ret = $ftp->ls("$_/$pep_template"); 1}) {
++            warn("Failure of \$ftp->ls(\"$_/$pep_template\") when cwd is $path on $host: $@\n");
++            $ftp->reconnect();
++          }
++          @ret;
++        };
+         my $found = @result;
+ 	if ($found) {
+           print "$id,$prot,$nuc,$short_only,$name$extra,$title2 from $db for <I>$name</I>.,$host/$path/$_/$pep_template,\n";
+ 	}
+       } else {
+         # check that nucleotide file exists
+-        my @result = $ftp->ls("$_/$dna_template");
++        my @result = do {
++          local $@;
++          my @ret;
++          unless (eval {@ret = $ftp->ls("$_/$dna_template"); 1}) {
++            warn("Failure of \$ftp->ls(\"$_/$dna_template\") when cwd is $path on $host: $@\n");
++            $ftp->reconnect();
++          }
++          @ret;
++        };
+         my $found = @result;
+ 	if ($found) {
+ 	  print "$id,$prot,$nuc,$short_only,$name$extra,$title2 from $db for <I>$name</I>.,$host/$path/$_/$pep_template,$host/$path/$_/$dna_template\n";
