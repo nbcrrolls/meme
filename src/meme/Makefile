@@ -86,12 +86,19 @@ meme-www.sh: meme-www.sh.in
 
 build: version.mk update-csv.sh update-csv-bootstrap.sh meme-www.sh
 	gunzip -c $(NAME)_$(MEMEVER).$(TARBALL_POSTFIX) | $(TAR) -xf -
-	cd patch-files && find . -type f | grep -v CVS | cpio -pduv ..
 
 	(							      \
 		cd $(NAME)_$(MEMEVER);				      \
 		../patch-$(MEMEVER);                                  \
 	)
+	( 							      \
+		cd $(NAME)_$(MEMEVER);				      \
+		aclocal;					      \
+		autoreconf --force --install;			      \
+	)
+
+	cd patch-files && find . -type f | grep -v CVS | cpio -pduv ..
+
 	( 							      \
 		cd $(NAME)_$(MEMEVER);				      \
 		export CATALINA_HOME=/opt/tomcat;		      \
