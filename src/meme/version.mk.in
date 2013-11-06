@@ -2,3 +2,4 @@ NAME    	= meme
 TARBALL_POSTFIX	= tar.gz
 RSATWS          = RSATWS
 RPM.EXTRAS     += "AutoReq: no"
+RELEASE = 2
