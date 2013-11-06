@@ -12,9 +12,11 @@
 
 JASPAR_CORE_2009.meme uniprobe_mouse.meme,no,yes,yes,JASPAR and UniPROBE,Searches JASPAR CORE and Mouse (UniPROBE).
 
-JASPAR_CORE_2009_vertebrates.meme uniprobe_mouse.meme,no,yes,yes,All Vertebrates,Searches JASPAR CORE vertebrates and Mouse (UniPROBE).
+JASPAR_CORE_2009_vertebrates.meme uniprobe_mouse.meme Jolma2013.meme,no,yes,yes,All Vertebrates,Searches JASPAR CORE vertebrates + UniProbe Mouse + Jolma2013 Human and Mouse
 
-jolma2013.meme,no,yes,yes,Human and Mouse (Jolma2013),Human and Mouse high-throughput SELEX motifs from <a href="http://dx.doi.org/10.1116/j.cell.2012.12.009"> Cell 213. 152(1-2):327-339</a>.
+jolma2013.meme,no,yes,yes,Human and Mouse (Jolma2013),Human and Mouse high-throughput SELEX motifs from <a href="http://dx.doi.org/10.1016/j.cell.2012.12.009"> Cell 2013. 152(1-2):327-339</a>.
+
+ray2013_rbp.meme,no,yes,yes,RNA-binding motifs (Ray2013),A compendium of 244 RNA-binding motifs from <a href="http://www.nature.com/nature/journal/v499/n7457/full/nature12311.html">Nature 2013. 11;499(7457):172-7</a>.  The are from in vitro experiments using the RNAcompete method for the rapid and systematic analysis of the RNA sequence preferences of RBPs.  The motifs are converted from the data in this <a href="http://hugheslab.ccbr.utoronto.ca/supplementary-data/RNAcompete_eukarya/top10align_motifs.tar.gz">archive file</a> of titled &quot;Top10align PFMs learned from all data&quot; that is supplied by the Ray et al. at their <a href="http://hugheslab.ccbr.utoronto.ca/supplementary-data/RNAcompete_eukarya">website</a>.
 
 fly_factor_survey.meme flyreg.v2.meme idmmpmm2009.meme dmmpmm2009.meme,no,yes,yes,All Drosophila,Searches Fly Factor Survey&#44; FLYREG&#44; iDMMPMM and DMMPMM.
 
