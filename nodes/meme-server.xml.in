@@ -65,6 +65,7 @@
 	<package>opt-perl-SOAP-Lite</package>
 	<package>opt-perl-Class-Inspector</package>
 	<package>opt-perl-XML-Simple</package>
+	<package>opt-perl-Net-FTP-AutoReconnect</package>
 
 <post>
 
