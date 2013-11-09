@@ -1,0 +1,7 @@
+RELEASE = 0
+
+PKGNAME    	= meme
+NAME    	= meme490
+TARBALL_POSTFIX	= tar.gz
+RSATWS          = RSATWS
+RPM.EXTRAS     += "AutoReq: no"

@@ -1,0 +1,774 @@
+diff -r c89599c3d819 -r 8863fbad99cd etc/mcast-to-html.xsl
+--- a/etc/mcast-to-html.xsl	Fri Aug 23 16:49:42 2013 +1000
++++ b/etc/mcast-to-html.xsl	Fri Nov 08 18:03:45 2013 +1000
+@@ -206,7 +206,7 @@
+             info_row = tbl.insertRow(seq_row.rowIndex + 1);
+             info_row.id = seqid + "_info";
+             var cell = info_row.insertCell(0);
+-            cell.colSpan = 8;
++            cell.colSpan = 9;
+             cell.style.verticalAlign = "top";
+             var width = Math.min(sequence.length, wrap); 
+             var start = 1;
+@@ -1487,7 +1487,7 @@
+         <a name="databases_doc"/>
+         <h5>Sequence Databases</h5>
+         <div class="doc">
+-          <p>This table summarises the sequence databases specified to MAST.</p>
++          <p>This table summarises the sequence databases specified to MCAST.</p>
+           <dl>
+             <dt>Database</dt>
+             <dd>The name of the database file.</dd>
+@@ -1500,13 +1500,13 @@
+         <a name="motifs_doc"/>
+         <h5>Motifs</h5>
+         <div class="doc">
+-          <p>Summary of the motifs specified to MAST.</p>
++          <p>Summary of the motifs specified to MCAST.</p>
+           <dl>
+             <dt>Name</dt>
+             <dd>The name of the motif. If the motif has been removed or removal is recommended to avoid highly similar motifs 
+               then it will be displayed in red text.</dd>
+             <dt>Width</dt>
+-            <dd>The width of the motif. No gaps are allowed in motifs supplied to MAST as it only works for motifs of a fixed width.</dd>
++            <dd>The width of the motif. No gaps are allowed in motifs supplied to MCAST as it only works for motifs of a fixed width.</dd>
+             <dt>Best possible match</dt>
+             <dd>The sequence that would achieve the best possible match score and its reverse complement for nucleotide motifs.</dd>
+           </dl>
+diff -r c89599c3d819 -r 8863fbad99cd scripts/JsonWr.pm
+--- a/scripts/JsonWr.pm	Fri Aug 23 16:49:42 2013 +1000
++++ b/scripts/JsonWr.pm	Fri Nov 08 18:03:45 2013 +1000
+@@ -3,6 +3,7 @@
+ use strict;
+ use warnings;
+ 
++use Carp qw(cluck confess);
+ use Data::Dumper;
+ use Scalar::Util qw(looks_like_number);
+ 
+@@ -38,6 +39,7 @@
+   my $self = shift;
+   $self->{logger}->trace('call JsonWr::property( '. Dumper(@_) . ' )') if $self->{logger};
+   my ($property) = @_;
++  confess("JSON property name was not defined!") unless (defined($property));
+   my $dest = $self->{dest};
+   $self->_enforce_state($STATE_EMPTY_OBJECT, $STATE_OBJECT);
+   if ($self->{state} != $STATE_EMPTY_OBJECT) {
+@@ -116,6 +118,10 @@
+   my $self = shift;
+   $self->{logger}->trace("call JsonWr::str_value( ". Dumper(@_).' )') if $self->{logger};
+   my ($value) = @_;
++  unless (defined($value)) {
++    cluck("JSON string value was not defined!");
++    $value = "";
++  }
+   $self->_write_value($self->_convert_string($value));
+ }
+ 
+diff -r c89599c3d819 -r 8863fbad99cd scripts/centrimo_webservice.pl.in
+--- a/scripts/centrimo_webservice.pl.in	Fri Aug 23 16:49:42 2013 +1000
++++ b/scripts/centrimo_webservice.pl.in	Fri Nov 08 18:03:45 2013 +1000
+@@ -40,6 +40,7 @@
+ use File::Temp qw(tempfile);
+ use Getopt::Long;
+ use Pod::Usage;
++use Time::HiRes qw(gettimeofday tv_interval);
+ 
+ use lib qw(@PERLLIBDIR@);
+ 
+@@ -47,6 +48,8 @@
+ use MemeWebUtils qw(is_safe_name add_status_msg update_status loggable_date write_invocation_log);
+ use Globals;
+ 
++# Globals
++my $t0 = [&gettimeofday()];
+ # constants
+ my $tmpdir = '@TMP_DIR@';
+ my $bin_dir = '@BINDIR@';
+@@ -60,6 +63,10 @@
+ my $log_date = loggable_date();
+ my $log_file = 'centrimo-log';
+ 
++# timeout vars
++my $timeout = $Globals::MAXTIME; # updated just before use
++my $oot = 0; #FALSE
++
+ # error files
+ my $messages = "messages.txt";
+ 
+@@ -227,9 +234,12 @@
+ unless (defined($bfile)) {
+   $bfile = $sequences . '.bg';
+   push(@{$file_list}, {file => $bfile, desc => 'Calculated Background'});
++
++  $timeout = $Globals::MAXTIME - int(&tv_interval($t0, [&gettimeofday()]) + 0.5);
+   my %fasta_get_markov = (PROG => 'fasta-get-markov', BIN => $bin_dir,
+     ARGS => ['-nostatus', '-m', 1], OUT_FILE => $bfile,
+-    ERR_FILE => $messages, IN_FILE => $sequences, TIME => \$time);
++    ERR_FILE => $messages, IN_FILE => $sequences, TIME => \$time,
++    TIMEOUT => $timeout, OOT => \$oot);
+ 
+   add_status_msg('Starting fasta-get-markov (to calculate background)<br><code>' . 
+     stringify_args2(%fasta_get_markov) . '</code>', $msg_list);
+@@ -237,7 +247,12 @@
+   update_status($page, $program, $refresh, $file_list, $msg_list, "Starting");
+ 
+   $status_code = invoke(%fasta_get_markov);
+-  if ($status_code != 0) {
++  if ($oot) {
++    $status_msg = "Ran out of time! Stopping fasta-get-markov.";
++    add_status_msg($status_msg, $msg_list);
++    print STDERR $status_msg;
++  }
++  if ($status_code != 0 || $oot) {
+     if ($status_code == -1) {
+       $status_msg = "fasta-get-markov failed to run";
+     } elsif ($status_code & 127) {
+@@ -248,6 +263,7 @@
+       $status_msg = "fasta-get-markov exited with error code " . ($status_code >> 8);
+     }
+     add_status_msg($status_msg, $msg_list);
++    print STDERR $status_msg;
+     push(@{$file_list}, {file => $messages, desc => 'Error Messages'});
+     update_status($page, $program, 0, $file_list, $msg_list, "Error");
+     write_invocation_log($log_file, $log_date, $log_args);
+@@ -281,16 +297,24 @@
+ # create the symlink
+ symlink($dbdir, 'db') if (@dbmotifs);
+ # run the program
++$timeout = $Globals::MAXTIME - int(&tv_interval($t0, [&gettimeofday()]) + 0.5);
+ $status_code = invoke(
+   PROG => 'centrimo', 
+   ARGS => \@centrimo_args, 
+   BIN => $bin_dir, 
+   ALL_FILE => $messages, 
+-  TIME => \$time);
++  TIME => \$time,
++  TIMEOUT => $timeout,
++  OOT => \$oot);
+ # remove the simlink
+ unlink('db') if (@dbmotifs);
+ 
+-if ($status_code != 0) {
++if ($oot) {
++  $status_msg = "Ran out of time! Stopping centrimo.";
++  add_status_msg($status_msg, $msg_list);
++  print STDERR $status_msg;
++}
++if ($status_code != 0 || $oot) {
+   if ($status_code == -1) {
+     $status_msg = "centrimo failed to run";
+   } elsif ($status_code & 127) {
+@@ -314,7 +338,7 @@
+ 
+ 
+ write_invocation_log($log_file, $log_date, $log_args);
+-exit(1) if $status_code;
++exit(1) if ($status_code || $oot);
+ 1;
+ 
+ 
+diff -r c89599c3d819 -r 8863fbad99cd scripts/fimo_webservice.pl.in
+--- a/scripts/fimo_webservice.pl.in	Fri Aug 23 16:49:42 2013 +1000
++++ b/scripts/fimo_webservice.pl.in	Fri Nov 08 18:03:45 2013 +1000
+@@ -24,6 +24,7 @@
+ use File::Temp qw(tempfile);
+ use Getopt::Long;
+ use Pod::Usage;
++use Time::HiRes qw(gettimeofday tv_interval);
+ 
+ use lib qw(@PERLLIBDIR@);
+ 
+@@ -31,6 +32,8 @@
+ use MemeWebUtils qw(is_safe_name add_status_msg update_status loggable_date write_invocation_log);
+ use Globals;
+ 
++# Globals
++my $t0 = [&gettimeofday()];
+ # constants
+ my $tmpdir = '@TMP_DIR@';
+ # use the perl default if none is supplied or the replace fails
+@@ -41,6 +44,8 @@
+ my $log_args = stringify_args(@ARGV);
+ my $log_date = loggable_date();
+ my $log_file = 'fimo-log';
++my $timeout = $Globals::MAXTIME; # updated just before use
++my $oot = 0; #FALSE
+ 
+ # error files
+ my $messages = "messages.txt";
+@@ -175,17 +180,25 @@
+ # create the symlink
+ symlink($dbdir, 'db') unless $upseqs;
+ # run the program
++$timeout = $Globals::MAXTIME - int(&tv_interval($t0, [&gettimeofday()]) + 0.5);
+ $status_code = invoke(
+   PROG => 'fimo', 
+   ARGS => \@fimo_args, 
+   BIN => '@BINDIR@', 
+   ALL_FILE => $messages, 
+-  TIME => \$time);
++  TIME => \$time,
++  TIMEOUT => $timeout,
++  OOT => \$oot);
+ # remove the simlink
+ unlink('db') unless $upseqs;
+ 
+ my $status_msg;
+-if ($status_code != 0) {
++if ($oot) {
++  $status_msg = "Ran out of time! Stopping fasta-get-markov.";
++  add_status_msg($status_msg, $msg_list);
++  print STDERR $status_msg;
++}
++if ($status_code != 0 || $oot) {
+   if ($status_code == -1) {
+     $status_msg = "fimo failed to run";
+   } elsif ($status_code & 127) {
+@@ -209,6 +222,6 @@
+ 
+ 
+ write_invocation_log($log_file, $log_date, $log_args);
+-exit(1) if $status_code;
++exit(1) if ($status_code || $oot);
+ 1;
+ 
+diff -r c89599c3d819 -r 8863fbad99cd scripts/glam2_webservice.pl.in
+--- a/scripts/glam2_webservice.pl.in	Fri Aug 23 16:49:42 2013 +1000
++++ b/scripts/glam2_webservice.pl.in	Fri Nov 08 18:03:45 2013 +1000
+@@ -34,6 +34,7 @@
+ use File::Temp qw(tempfile);
+ use Getopt::Long;
+ use Pod::Usage;
++use Time::HiRes qw(gettimeofday tv_interval);
+ 
+ use lib qw(@PERLLIBDIR@);
+ 
+@@ -41,6 +42,8 @@
+ use MemeWebUtils qw(is_safe_name add_status_msg update_status loggable_date write_invocation_log);
+ use Globals;
+ 
++# Globals
++my $t0 = [&gettimeofday()];
+ # constants
+ my $tmpdir = '@TMP_DIR@';
+ # use the perl default if none is supplied or the replace fails
+@@ -51,6 +54,10 @@
+ my $log_date = loggable_date();
+ my $log_file = 'glam2-log';
+ 
++# timeout vars
++my $timeout = $Globals::MAXTIME; # updated just before use
++my $oot = 0; #FALSE
++
+ # error files
+ my $messages = "messages.txt";
+ 
+@@ -255,15 +262,23 @@
+ 
+ my ($time, $status_code);
+ # run the program
++$timeout = $Globals::MAXTIME - int(&tv_interval($t0, [&gettimeofday()]) + 0.5);
+ $status_code = invoke(
+   PROG => 'glam2', 
+   ARGS => \@glam2_args, 
+   BIN => '@BINDIR@', 
+   ALL_FILE => $messages, 
+-  TIME => \$time);
++  TIME => \$time,
++  TIMEOUT => $timeout,
++  OOT => \$oot);
+ 
+ my $status_msg;
+-if ($status_code != 0) {
++if ($oot) {
++  $status_msg = "Ran out of time! Stopping glam2.";
++  add_status_msg($status_msg, $msg_list);
++  print STDERR $status_msg;
++}
++if ($status_code != 0 || $oot) {
+   if ($status_code == -1) {
+     $status_msg = "glam2 failed to run";
+   } elsif ($status_code & 127) {
+@@ -287,6 +302,6 @@
+ 
+ 
+ write_invocation_log($log_file, $log_date, $log_args);
+-exit(1) if $status_code;
++exit(1) if ($status_code || $oot);
+ 1;
+ 
+diff -r c89599c3d819 -r 8863fbad99cd scripts/glam2scan_webservice.pl.in
+--- a/scripts/glam2scan_webservice.pl.in	Fri Aug 23 16:49:42 2013 +1000
++++ b/scripts/glam2scan_webservice.pl.in	Fri Nov 08 18:03:45 2013 +1000
+@@ -26,6 +26,7 @@
+ use File::Temp qw(tempfile);
+ use Getopt::Long;
+ use Pod::Usage;
++use Time::HiRes qw(gettimeofday tv_interval);
+ 
+ use lib qw(@PERLLIBDIR@);
+ 
+@@ -33,6 +34,8 @@
+ use MemeWebUtils qw(is_safe_name add_status_msg update_status loggable_date write_invocation_log);
+ use Globals;
+ 
++# Globals
++my $t0 = [&gettimeofday()];
+ # constants
+ my $tmpdir = '@TMP_DIR@';
+ # use the perl default if none is supplied or the replace fails
+@@ -202,6 +205,7 @@
+ 
+   my $prog = $options{PROG};
+   my @args = @{$options{ARGS}};
++  my ($timeout, $oot);
+ 
+   add_status_msg('Starting '.$prog.'<br><code>' . stringify_args($prog, @args) . '</code>', $msg_list);
+ 
+@@ -209,9 +213,13 @@
+ 
+   my ($time, $status_code);
+   # run the program
+-  $status_code = invoke(@_, TIME => \$time);
++  $timeout = $Globals::MAXTIME - int(&tv_interval($t0, [&gettimeofday()]) + 0.5);
++  $status_code = invoke(@_, TIME => \$time, TIMEOUT => $timeout, OOT => \$oot);
+   my $status_msg;
+-  if ($status_code != 0) {
++  if ($oot) {
++    $status_msg = "Ran out of time! Stopping " . $prog . ".";
++  }
++  if ($status_code != 0 || $oot) {
+     if ($status_code == -1) {
+       $status_msg = $prog . " failed to run";
+     } elsif ($status_code & 127) {
+@@ -232,7 +240,7 @@
+   update_status($page, $program, ($status_code ? 0 : $refresh), 
+     $file_list, $msg_list, ($status_code ? "Error" : ""));
+ 
+-  if ($status_code) {
++  if ($status_code || $oot) {
+     write_invocation_log($log_file, $log_date, $log_args);
+     exit(1);
+   }
+diff -r c89599c3d819 -r 8863fbad99cd scripts/gomo_webservice.pl.in
+--- a/scripts/gomo_webservice.pl.in	Fri Aug 23 16:49:42 2013 +1000
++++ b/scripts/gomo_webservice.pl.in	Fri Nov 08 18:03:45 2013 +1000
+@@ -25,6 +25,7 @@
+ use File::Temp qw(tempfile);
+ use Getopt::Long;
+ use Pod::Usage;
++use Time::HiRes qw(gettimeofday tv_interval);
+ 
+ use lib qw(@PERLLIBDIR@);
+ 
+@@ -32,6 +33,8 @@
+ use MemeWebUtils qw(is_safe_name add_status_msg update_status loggable_date write_invocation_log);
+ use Globals;
+ 
++# Globals
++my $t0 = [&gettimeofday()];
+ # constants
+ my $tmpdir = '@TMP_DIR@';
+ # use the perl default if none is supplied or the replace fails
+@@ -239,6 +242,7 @@
+ 
+   my $prog = $options{PROG};
+   my @args = @{$options{ARGS}};
++  my ($timeout, $oot);
+ 
+   add_status_msg('Starting '.$prog.'<br><code>' . stringify_args($prog, @args) . '</code>', $msg_list);
+ 
+@@ -246,8 +250,14 @@
+ 
+   my ($time, $status_code);
+   # run the program
+-  $status_code = invoke(@_, TIME => \$time);
++  $timeout = $Globals::MAXTIME - int(&tv_interval($t0, [&gettimeofday()]) + 0.5);
++  $status_code = invoke(@_, TIME => \$time, TIMEOUT => $timeout, OOT => \$oot);
+   my $status_msg;
++  if ($oot) {
++    $status_msg = "Ran out of time! Stopping ". $prog .".";
++    add_status_msg($status_msg, $msg_list);
++    print STDERR $status_msg;
++  }
+   if ($status_code != 0) {
+     if ($status_code == -1) {
+       $status_msg = $prog . " failed to run";
+diff -r c89599c3d819 -r 8863fbad99cd scripts/mast_webservice.pl.in
+--- a/scripts/mast_webservice.pl.in	Fri Aug 23 16:49:42 2013 +1000
++++ b/scripts/mast_webservice.pl.in	Fri Nov 08 18:03:45 2013 +1000
+@@ -32,6 +32,7 @@
+ use File::Temp qw(tempfile);
+ use Getopt::Long;
+ use Pod::Usage;
++use Time::HiRes qw(gettimeofday tv_interval);
+ 
+ use lib qw(@PERLLIBDIR@);
+ 
+@@ -39,6 +40,8 @@
+ use MemeWebUtils qw(is_safe_name add_status_msg update_status loggable_date write_invocation_log);
+ use Globals;
+ 
++# Globals
++my $t0 = [&gettimeofday()];
+ # constants
+ my $tmpdir = '@TMP_DIR@';
+ # use the perl default if none is supplied or the replace fails
+@@ -51,6 +54,10 @@
+ my $log_date = loggable_date();
+ my $log_file = 'mast-log';
+ 
++# timeout vars
++my $timeout = $Globals::MAXTIME; # updated just before use
++my $oot = 0; #FALSE
++
+ # error files
+ my $messages = "messages.txt";
+ 
+@@ -243,17 +250,25 @@
+ # create the symlink
+ symlink($dbdir, 'db') unless $upload_db;
+ # run the program
++$timeout = $Globals::MAXTIME - int(&tv_interval($t0, [&gettimeofday()]) + 0.5);
+ $status_code = invoke(
+   PROG => 'mast', 
+   ARGS => \@mast_args, 
+   BIN => '@BINDIR@', 
+   ALL_FILE => $messages, 
+-  TIME => \$time);
++  TIME => \$time,
++  TIMEOUT => $timeout,
++  OOT => \$oot);
+ # remove the simlink
+ unlink('db') unless $upload_db;
+ 
+ my $status_msg;
+-if ($status_code != 0) {
++if ($oot) {
++    $status_msg = "Ran out of time! Stopping mast.";
++    add_status_msg($status_msg, $msg_list);
++    print STDERR $status_msg;
++}
++if ($status_code != 0 || $oot) {
+   if ($status_code == -1) {
+     $status_msg = "mast failed to run";
+   } elsif ($status_code & 127) {
+@@ -277,5 +292,5 @@
+ 
+ 
+ write_invocation_log($log_file, $log_date, $log_args);
+-exit(1) if $status_code;
++exit(1) if ($status_code || $oot);
+ 1;
+diff -r c89599c3d819 -r 8863fbad99cd scripts/mcast_webservice.pl.in
+--- a/scripts/mcast_webservice.pl.in	Fri Aug 23 16:49:42 2013 +1000
++++ b/scripts/mcast_webservice.pl.in	Fri Nov 08 18:03:45 2013 +1000
+@@ -26,6 +26,7 @@
+ use File::Temp qw(tempfile);
+ use Getopt::Long;
+ use Pod::Usage;
++use Time::HiRes qw(gettimeofday tv_interval);
+ 
+ use lib qw(@PERLLIBDIR@);
+ 
+@@ -33,6 +34,8 @@
+ use MemeWebUtils qw(is_safe_name add_status_msg update_status loggable_date write_invocation_log);
+ use Globals;
+ 
++# Globals
++my $t0 = [&gettimeofday()];
+ # constants
+ my $tmpdir = '@TMP_DIR@';
+ # use the perl default if none is supplied or the replace fails
+@@ -44,6 +47,10 @@
+ my $log_date = loggable_date();
+ my $log_file = 'mcast-log';
+ 
++# timeout vars
++my $timeout = $Globals::MAXTIME; # updated just before use
++my $oot = 0; #FALSE
++
+ # error files
+ my $messages = "messages.txt";
+ 
+@@ -195,17 +202,25 @@
+ # create the symlink
+ symlink($dbdir, 'db') unless $upseqs;
+ # run the program
++$timeout = $Globals::MAXTIME - int(&tv_interval($t0, [&gettimeofday()]) + 0.5);
+ $status_code = invoke(
+   PROG => 'mcast', 
+   ARGS => \@mcast_args, 
+   BIN => '@BINDIR@', 
+   ALL_FILE => $messages, 
+-  TIME => \$time);
++  TIME => \$time,
++  TIMEOUT => $timeout,
++  OOT => \$oot);
+ # remove the simlink
+ unlink('db') unless $upseqs;
+ 
+ my $status_msg;
+-if ($status_code != 0) {
++if ($oot) {
++  $status_msg = "Ran out of time! Stopping mcast.";
++  add_status_msg($status_msg, $msg_list);
++  print STDERR $status_msg;
++}
++if ($status_code != 0 || $oot) {
+   if ($status_code == -1) {
+     $status_msg = "mcast failed to run";
+   } elsif ($status_code & 127) {
+@@ -229,6 +244,6 @@
+ 
+ 
+ write_invocation_log($log_file, $log_date, $log_args);
+-exit(1) if $status_code;
++exit(1) if ($status_code || $oot);
+ 1;
+ 
+diff -r c89599c3d819 -r 8863fbad99cd scripts/meme-chip.pl.in
+--- a/scripts/meme-chip.pl.in	Fri Aug 23 16:49:42 2013 +1000
++++ b/scripts/meme-chip.pl.in	Fri Nov 08 18:03:45 2013 +1000
+@@ -276,7 +276,7 @@
+   # reset STDERR
+   open(STDERR, ">&", $olderr) or die("Can't reset STDERR: $!");
+   # read argument parsing errors
+-  seek($tmperr, SEEK_SET, 0);
++  seek($tmperr, 0, SEEK_SET);
+   while (<$tmperr>) {chomp; push(@errors, $_);}
+   close($tmperr);
+   # by default make the weak threshold to 2 times the strong threshold
+@@ -1158,7 +1158,7 @@
+         $jsonwr->start_object_value();
+         $jsonwr->num_prop('db', $match->{db});
+         $jsonwr->str_prop('id', $match->{id});
+-        $jsonwr->str_prop('alt', $match->{alt});
++        $jsonwr->str_prop('alt', $match->{alt}) if ($match->{alt});
+         $jsonwr->end_object_value();
+       }
+     }
+diff -r c89599c3d819 -r 8863fbad99cd scripts/spamo_webservice.pl.in
+--- a/scripts/spamo_webservice.pl.in	Fri Aug 23 16:49:42 2013 +1000
++++ b/scripts/spamo_webservice.pl.in	Fri Nov 08 18:03:45 2013 +1000
+@@ -27,12 +27,16 @@
+ use File::Temp qw(tempfile);
+ use Getopt::Long;
+ use Pod::Usage;
++use Time::HiRes qw(gettimeofday tv_interval);
+ 
+ use lib qw(@PERLLIBDIR@);
+ 
+ use ExecUtils qw(stringify_args invoke);
+ use MemeWebUtils qw(add_status_msg update_status loggable_date write_invocation_log);
++use Globals;
+ 
++# Globals
++my $t0 = [&gettimeofday()];
+ # constants
+ my $dump_seqs_dir = 'dumpseqs';
+ my $dump_seqs_tar = 'dumpseqs.tar.gz';
+@@ -46,6 +50,10 @@
+ my $log_date = loggable_date();
+ my $log_file = 'spamo-log';
+ 
++# timeout vars
++my $timeout = $Globals::MAXTIME; # updated just before use
++my $oot = 0; #FALSE
++
+ #status page
+ my $file_list;
+ my @arg_errors = ();
+@@ -208,12 +216,15 @@
+ 
+ # run the program
+ my $time = 0;
++$timeout = $Globals::MAXTIME - int(&tv_interval($t0, [&gettimeofday()]) + 0.5);
+ my $status_code = invoke(
+   PROG => 'spamo', 
+   ARGS => \@spamo_args,
+   BIN => '@BINDIR@', 
+   ALL_FILE => $messages, 
+-  TIME => \$time
++  TIME => \$time,
++  TIMEOUT => $timeout,
++  OOT => \$oot
+ );
+ my $elapsed = int($time * 100 + 0.5) / 100;
+ 
+@@ -244,7 +255,12 @@
+ 
+ # check the result for errors
+ my $error_msg = '';
+-if ($status_code != 0) {
++if ($oot) {
++    $error_msg = "Ran out of time! Stopping spamo.";
++    add_status_msg($error_msg, $msg_list);
++    print STDERR $error_msg;
++}
++if ($status_code != 0 || $oot) {
+   if ($status_code == -1) {
+     $error_msg = "Spamo failed to run";
+   } elsif ($status_code & 127) {
+@@ -267,6 +283,6 @@
+ 
+ write_invocation_log($log_file, $log_date, $log_args);
+ # exit if there was an error running spamo
+-exit(1) if ($status_code);
++exit(1) if ($status_code || $oot);
+ 
+ 1;
+diff -r c89599c3d819 -r 8863fbad99cd scripts/tomtom_webservice.pl.in
+--- a/scripts/tomtom_webservice.pl.in	Fri Aug 23 16:49:42 2013 +1000
++++ b/scripts/tomtom_webservice.pl.in	Fri Nov 08 18:03:45 2013 +1000
+@@ -37,6 +37,7 @@
+ use File::Temp qw(tempfile);
+ use Getopt::Long;
+ use Pod::Usage;
++use Time::HiRes qw(gettimeofday tv_interval);
+ 
+ use lib qw(@PERLLIBDIR@);
+ 
+@@ -44,6 +45,8 @@
+ use MemeWebUtils qw(is_safe_name add_status_msg update_status loggable_date write_invocation_log);
+ use Globals;
+ 
++# Globals
++my $t0 = [&gettimeofday()];
+ # constants
+ my $tmpdir = '@TMP_DIR@';
+ # use the perl default if none is supplied or the replace fails
+@@ -56,6 +59,10 @@
+ my $log_date = loggable_date();
+ my $log_file = 'tomtom-log';
+ 
++# timeout vars
++my $timeout = $Globals::MAXTIME; # updated just before use
++my $oot = 0; #FALSE
++
+ # error files
+ my $messages = "messages.txt";
+ 
+@@ -235,18 +242,26 @@
+ # create the symlink
+ symlink($dbdir, 'db') unless $uptargets;
+ # run the program
++$timeout = $Globals::MAXTIME - int(&tv_interval($t0, [&gettimeofday()]) + 0.5);
+ $status_code = invoke(
+   PROG => 'tomtom', 
+   ARGS => \@tomtom_args, 
+   BIN => '@BINDIR@', 
+   ALL_FILE => $messages, 
+   TIME => \$time,
+-  NICE => ($niced ? 19 : undef));
++  NICE => ($niced ? 19 : undef),
++  TIMEOUT => $timeout,
++  OOT => \$oot);
+ # remove the simlink
+ unlink('db') unless $uptargets;
+ 
+ my $status_msg;
+-if ($status_code != 0) {
++if ($oot) {
++  $status_msg = "Ran out of time! Stopping tomtom.";
++  add_status_msg($status_msg, $msg_list);
++  print STDERR $status_msg;
++}
++if ($status_code != 0 || $oot) {
+   if ($status_code == -1) {
+     $status_msg = "tomtom failed to run";
+   } elsif ($status_code & 127) {
+@@ -270,5 +285,5 @@
+ 
+ 
+ write_invocation_log($log_file, $log_date, $log_args);
+-exit(1) if $status_code;
++exit(1) if ($status_code || $oot);
+ 1;
+diff -r c89599c3d819 -r 8863fbad99cd src/html-data.c
+--- a/src/html-data.c	Fri Aug 23 16:49:42 2013 +1000
++++ b/src/html-data.c	Fri Nov 08 18:03:45 2013 +1000
+@@ -368,8 +368,8 @@
+   if (str_len(ctxt->strb) > 0 && str_char(ctxt->strb, -1) == '/') {
+     // remove the trailing /
+     str_truncate(ctxt->strb, -1);
+-    // keep it unparsed
+-    i--;
++    // set the trailing slash mode, this is mostly handled by state_intag
++    ctxt->trailing_slash = TRUE;
+   }
+   // find the tag (if it exists)
+   ctxt->tag = (TAG_T*)rbtree_get(ctxt->tags, str_internal(ctxt->strb));
+@@ -399,7 +399,7 @@
+   }
+   if (i >= size) return size; // all space, need more chunks!
+   if (chunk[i] == '/') {
+-    ctxt->trailing_slash = TRUE;
++    ctxt->trailing_slash = TRUE; // note that this might also be set by state_tagname
+   } else if (chunk[i] == '>' || chunk[i] == '<') {
+     complete_tag(ctxt);
+     // check if we need to ignore stuff
+diff -r c89599c3d819 -r 8863fbad99cd src/motif-in-meme-text.c
+--- a/src/motif-in-meme-text.c	Fri Aug 23 16:49:42 2013 +1000
++++ b/src/motif-in-meme-text.c	Fri Nov 08 18:03:45 2013 +1000
+@@ -122,7 +122,7 @@
+ static const char * DATAFILE_RE = "^[[:space:]]*DATAFILE[[:space:]]*="
+     "[[:space:]]*([^[:space:]].*)$";
+ static const char * ALPHABET_RE = "^[[:space:]]*ALPHABET[[:space:]]*="
+-    "[[:space:]]*(.*)[[:space:]]*$";
++    "[[:space:]]*([^[:space:]]*)[[:space:]]*$";
+ static const char * STRANDS_RE = "^[[:space:]]*strands[[:space:]]*:"
+     "([-+[:space:]]*)$";
+ static const char * POS_STRAND_RE = "\\+";
+diff -r c89599c3d819 -r 8863fbad99cd src/tomtom.c
+--- a/src/tomtom.c	Fri Aug 23 16:49:42 2013 +1000
++++ b/src/tomtom.c	Fri Nov 08 18:03:45 2013 +1000
+@@ -2297,6 +2297,7 @@
+   {
+     //for each target database
+     for (i = 0; i < arraylst_size(target_dbs); ++i) {
++      ALPH_T target_alph;
+       BOOLEAN_T printed_warning = FALSE;
+       MOTIF_T *motif;
+       RBTREE_T *ids;
+@@ -2311,6 +2312,13 @@
+       mread_set_bg_source(mread, bg_file);
+       mread_set_pseudocount(mread, target_pseudocount);
+ 
++      // check the alphabet
++      target_alph = mread_get_alphabet(mread);
++      if (mread_has_motif(mread) && target_alph != alph) {
++        die("The target motifs in \"%s\" have the %s alphabet which is not "
++            "the same as the query motifs.", db->name, alph_name(target_alph));
++      }
++
+       //for duplicate checking within the database
+       ids = rbtree_create(rbtree_strcmp, NULL, NULL, NULL, NULL);
+ 
+@@ -2349,7 +2357,16 @@
+         }
+       }
+       db->list_entries = db->loaded - db->excluded;
++      if (db->list_entries == 0) {
++        fprintf(stderr, "Warning: Target database \"%s\" did not contain ANY "
++            "loadable motifs!\n", db->name);
++      }
+     }//for each target db
++    if (!bg_freqs_target) bg_freqs_target = get_uniform_frequencies(alph, NULL);
++    // check we got something
++    if (arraylst_size(target_motifs) == 0) {
++      fprintf(stderr, "Warning: No target motifs loaded!\n");
++    }
+   }//end loading motifs
+ 
+   /**********************************************
+@@ -2670,7 +2687,7 @@
+       free_matrix(pairwise_subset);
+     } // Scores computed for all targets.
+ 
+-    if (complete_scores) {
++    if (complete_scores && target_count > 0) {
+       // Calculates the p-values and e-values of the shifted scores
+       calc_shifted_scores_pvalues_per_query(
+         query_motif,

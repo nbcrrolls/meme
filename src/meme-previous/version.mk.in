@@ -1,5 +1,0 @@
-PKGNAME    	= meme
-NAME    	= memeprev
-TARBALL_POSTFIX	= tar.gz
-RSATWS          = RSATWS
-RPM.EXTRAS     += "AutoReq: no"

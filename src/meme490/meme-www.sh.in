@@ -1,0 +1,13 @@
+#!/bin/bash
+
+# make links for web CGI access 
+if [ -e /var/www/html/meme ] ; then
+   rm -rf /var/www/html/meme
+fi
+ln -s /opt/meme_@MEMEVER@/web /var/www/html/meme_@MEMEVER@
+ln -s /opt/meme_@MEMEVER@/web /var/www/html/meme
+
+if [ ! -e /var/www/html/meme_@MEMEPREV@ ] ; then
+    ln -s /opt/meme_@MEMEPREV@/web /var/www/html/meme_@MEMEPREV@
+fi
+

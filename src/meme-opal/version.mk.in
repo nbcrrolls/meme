@@ -1,2 +1,4 @@
+RELEASE = 0
+
 PKGROOT	= /opt/opal/deployed
 NAME   	= meme-opal

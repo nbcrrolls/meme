@@ -1,0 +1,30 @@
+#!/bin/bash
+
+# Creates motif_db.index and gomo_db.index files in <install>/etc/
+# Run if motif_db.csv and gomo_db.csv files were changed. 
+
+setDefaults () {
+BASE=/opt/@NAME@_@MEMEVER@
+LIB=$BASE/lib/perl
+ETC=$BASE/etc
+export RSATWS=$BASE/lib/perl/RSATWS
+
+mkdir -p $ETC/prev
+}
+
+makeIndexFile () {
+# create index file
+
+if [ -f $ETC/$1.index.new ] ; then
+    /bin/rm -f $ETC/$1.index.new
+fi
+
+/opt/perl/bin/perl -I $LIB -MCatList -e "CatList::index_catlist_csv('$ETC/$1.csv', '$ETC/$1.index.new')"
+/bin/cp -f -p $ETC/$1.index $ETC/prev/
+/bin/mv -f $ETC/$1.index.new  $ETC/$1.index
+echo "Created index file $ETC/$1.index" 
+}
+
+setDefaults 
+makeIndexFile motif_db
+makeIndexFile gomo_db

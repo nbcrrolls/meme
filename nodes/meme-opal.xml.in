@@ -32,14 +32,14 @@
 <post>
 
 <!-- create needed web CGI links on opal server node -->
-if [ -f /opt/meme/rocks/meme-www.sh ] ; then
-    /opt/meme/rocks/meme-www.sh
+if [ -f /opt/meme_MEMEVER/rocks/meme-www.sh ] ; then
+    /opt/meme_MEMEVER/rocks/meme-www.sh
 fi
 
 <!-- restart httpd -->
 /etc/init.d/httpd restart
 
-LOGFILE=/tmp/meme-deploy.log
+LOGFILE=/tmp/meme-MEMEVER-deploy.log
 
 if [ -f /opt/opal/deployed/deploy_meme_MEMEVER.sh ]; then
     /bin/su tomcat -c "/opt/opal/deployed/deploy_meme_MEMEVER.sh" &gt; $LOGFILE  2&gt;&amp;1

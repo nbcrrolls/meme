@@ -71,8 +71,8 @@
 
 
 <!-- create needed NFS-shared directories on frontend -->
-if [ -f /opt/meme/rocks/meme-nfs.sh ] ; then
-    /opt/meme/rocks/meme-nfs.sh
+if [ -f /opt/meme_MEMEVER/rocks/meme-nfs.sh ] ; then
+    /opt/meme_MEMEVER/rocks/meme-nfs.sh
 fi
 
 <file name="/etc/auto.share" mode="append">

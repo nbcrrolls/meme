@@ -16,7 +16,7 @@ SEDSPEC += \
 	-e 's%@ROCKS_VERSION@%$(ROCKS_VERSION)%g' 
 
 version.mk: 
-	cat version.mk.in ../version.mk > version.mk
+	cat ../version.mk version.mk.in > version.mk
 	if [ ! -d ./images ]; then \
 	    mkdir -p ./images ; \
 	fi

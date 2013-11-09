@@ -1,0 +1,8 @@
+#!/bin/bash
+
+patch -p1 -i ../patches/patch_4.9.0_1
+patch -p1 -i ../patches/patch_4.9.0_2
+patch -p1 -i ../patches/patch_4.9.0_3
+patch -p1 -i ../patches/patch_4.9.0_4
+patch -p1 -i ../patches/fasta-get-markov.patch
+patch -p1 -i ../patches/get_db_csv_v2.patch
