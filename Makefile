@@ -26,8 +26,8 @@
 include Rolls.mk
 
 version.mk:
-	grep "MEMEVER =" src/version.mk > version.mk
-	grep "MEMEPREV =" src/version.mk >> version.mk
+	grep "MEMEVER" src/version.mk > version.mk
+	grep "MEMEPREV" src/version.mk >> version.mk
 	cat version.mk.in >> version.mk
 
 default: 
@@ -36,7 +36,7 @@ default:
 	    cp $$i $$o; \
 	    sed -i -e "s/MEMEVER/$(MEMEVER)/g" -e "s/MEMEPREV/$(MEMEPREV)/g" $$o; \
 	done
-	#$(MAKE) roll
+	$(MAKE) roll
 
 clean::
 	rm -rf extramods _arch bootstrap.py
