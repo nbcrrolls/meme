@@ -4,4 +4,4 @@ NAME    	= meme-db
 TARBALL_POSTFIX	= tgz
 GOMO          = gomo_databases
 MOTIF         = motif_databases
-MOTIF_VERSION = 10.3
+MOTIF_VERSION = 11
