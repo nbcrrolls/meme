@@ -1,42 +1,42 @@
 #!/bin/bash
 
 VER=@MEMEVER@
-ANT=/opt/rocks/bin/ant
-OPALXML=/opt/opal/build.xml
+DEPLOYDIR=/opt/tomcat/deployed
 
-echo ant -f $OPALXML undeploy -DserviceName=FIMO_${VER} 
-     ant -f $OPALXML undeploy -DserviceName=FIMO_${VER} 
 
-echo ant -f $OPALXML undeploy -DserviceName=MEME_${VER} 
-     ant -f $OPALXML undeploy -DserviceName=MEME_${VER} 
+echo undeploying FIMO_${VER}
+rm $DEPLOYDIR/FIMO_${VER}.xml
 
-echo ant -f $OPALXML undeploy -DserviceName=MAST_${VER} 
-     ant -f $OPALXML undeploy -DserviceName=MAST_${VER} 
+echo undeploying MEME_${VER}
+rm $DEPLOYDIR/MEME_${VER}.xml
 
-echo ant -f $OPALXML undeploy -DserviceName=GLAM2_${VER} 
-     ant -f $OPALXML undeploy -DserviceName=GLAM2_${VER} 
+echo undeploying MAST_${VER}
+rm $DEPLOYDIR/MAST_${VER}.xml
 
-echo ant -f $OPALXML undeploy -DserviceName=GLAM2SCAN_${VER} 
-     ant -f $OPALXML undeploy -DserviceName=GLAM2SCAN_${VER} 
+echo undeploying GLAM2_${VER}
+rm $DEPLOYDIR/GLAM2_${VER}.xml
 
-echo ant -f $OPALXML undeploy -DserviceName=GOMO_${VER} 
-     ant -f $OPALXML undeploy -DserviceName=GOMO_${VER} 
+echo undeploying GLAM2SCAN_${VER}
+rm $DEPLOYDIR/GLAM2SCAN_${VER}.xml
 
-echo ant -f $OPALXML undeploy -DserviceName=MCAST_${VER} 
-     ant -f $OPALXML undeploy -DserviceName=MCAST_${VER} 
+echo undeploying GOMO_${VER}
+rm $DEPLOYDIR/GOMO_${VER}.xml
 
-echo ant -f $OPALXML undeploy -DserviceName=TOMTOM_${VER} 
-     ant -f $OPALXML undeploy -DserviceName=TOMTOM_${VER} 
+echo undeploying MCAST_${VER}
+rm $DEPLOYDIR/MCAST_${VER}.xml
 
-echo ant -f $OPALXML undeploy -DserviceName=SPAMO_${VER} 
-     ant -f $OPALXML undeploy -DserviceName=SPAMO_${VER} 
+echo undeploying TOMTOM_${VER}
+rm $DEPLOYDIR/TOMTOM_${VER}.xml
 
-echo ant -f $OPALXML undeploy -DserviceName=MEMECHIP_${VER} 
-     ant -f $OPALXML undeploy -DserviceName=MEMECHIP_${VER} 
+echo undeploying SPAMO_${VER}
+rm $DEPLOYDIR/SPAMO_${VER}.xml
 
-echo ant -f $OPALXML undeploy -DserviceName=DREME_${VER} 
-     ant -f $OPALXML undeploy -DserviceName=DREME_${VER} 
+echo undeploying MEMECHIP_${VER}
+rm $DEPLOYDIR/MEMECHIP_${VER}.xml
 
-echo ant -f $OPALXML undeploy -DserviceName=CENTRIMO_${VER} 
-     ant -f $OPALXML undeploy -DserviceName=CENTRIMO_${VER} 
+echo undeploying DREME_${VER}
+rm $DEPLOYDIR/DREME_${VER}.xml
+
+echo undeploying CENTRIMO_${VER}
+rm $DEPLOYDIR/CENTRIMO_${VER}.xml
 

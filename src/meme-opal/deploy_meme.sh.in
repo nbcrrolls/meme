@@ -1,43 +1,42 @@
 #!/bin/bash
 
 VER=@MEMEVER@
-ANT=/opt/rocks/bin/ant
-OPALXML=/opt/opal/build.xml
 OPALCONFIG=/opt/meme_@MEMEVER@/etc
+DEPLOYDIR=/opt/tomcat/deployed
 
-echo ant -f $OPALXML deploy -DserviceName=FIMO_${VER} -DappConfig=$OPALCONFIG/fimo_config.xml
-     ant -f $OPALXML deploy -DserviceName=FIMO_${VER} -DappConfig=$OPALCONFIG/fimo_config.xml
+echo deploy FIMO_${VER}
+cp $OPALCONFIG/fimo_config.xml $DEPLOYDIR/FIMO_${VER}.xml
 
-echo ant -f $OPALXML deploy -DserviceName=MEME_${VER} -DappConfig=$OPALCONFIG/meme_config.xml
-     ant -f $OPALXML deploy -DserviceName=MEME_${VER} -DappConfig=$OPALCONFIG/meme_config.xml
+echo deploy MEME_${VER}
+cp $OPALCONFIG/meme_config.xml $DEPLOYDIR/MEME_${VER}.xml
 
-echo ant -f $OPALXML deploy -DserviceName=MAST_${VER} -DappConfig=$OPALCONFIG/mast_config.xml
-     ant -f $OPALXML deploy -DserviceName=MAST_${VER} -DappConfig=$OPALCONFIG/mast_config.xml
+echo deploy MAST_${VER}
+cp $OPALCONFIG/mast_config.xml $DEPLOYDIR/MAST_${VER}.xml
 
-echo ant -f $OPALXML deploy -DserviceName=GLAM2_${VER} -DappConfig=$OPALCONFIG/glam2_config.xml
-     ant -f $OPALXML deploy -DserviceName=GLAM2_${VER} -DappConfig=$OPALCONFIG/glam2_config.xml
+echo deploy GLAM2_${VER}
+cp $OPALCONFIG/glam2_config.xml $DEPLOYDIR/GLAM2_${VER}.xml
 
-echo ant -f $OPALXML deploy -DserviceName=GLAM2SCAN_${VER} -DappConfig=$OPALCONFIG/glam2scan_config.xml
-     ant -f $OPALXML deploy -DserviceName=GLAM2SCAN_${VER} -DappConfig=$OPALCONFIG/glam2scan_config.xml
+echo deploy GLAM2SCAN_${VER}
+cp $OPALCONFIG/glam2scan_config.xml $DEPLOYDIR/GLAM2SCAN_${VER}.xml
 
-echo ant -f $OPALXML deploy -DserviceName=GOMO_${VER} -DappConfig=$OPALCONFIG/gomo_config.xml
-     ant -f $OPALXML deploy -DserviceName=GOMO_${VER} -DappConfig=$OPALCONFIG/gomo_config.xml
+echo deploy GOMO_${VER}
+cp $OPALCONFIG/gomo_config.xml $DEPLOYDIR/GOMO_${VER}.xml
 
-echo ant -f $OPALXML deploy -DserviceName=MCAST_${VER} -DappConfig=$OPALCONFIG/mcast_config.xml
-     ant -f $OPALXML deploy -DserviceName=MCAST_${VER} -DappConfig=$OPALCONFIG/mcast_config.xml
+echo deploy MCAST_${VER}
+cp $OPALCONFIG/mcast_config.xml $DEPLOYDIR/MCAST_${VER}.xml
 
-echo ant -f $OPALXML deploy -DserviceName=TOMTOM_${VER} -DappConfig=$OPALCONFIG/tomtom_config.xml
-     ant -f $OPALXML deploy -DserviceName=TOMTOM_${VER} -DappConfig=$OPALCONFIG/tomtom_config.xml
+echo deploy TOMTOM_${VER}
+cp $OPALCONFIG/tomtom_config.xml $DEPLOYDIR/TOMTOM_${VER}.xml
 
-echo ant -f $OPALXML deploy -DserviceName=SPAMO_${VER} -DappConfig=$OPALCONFIG/spamo_config.xml
-     ant -f $OPALXML deploy -DserviceName=SPAMO_${VER} -DappConfig=$OPALCONFIG/spamo_config.xml
+echo deploy SPAMO_${VER}
+cp $OPALCONFIG/spamo_config.xml $DEPLOYDIR/SPAMO_${VER}.xml
 
-echo ant -f $OPALXML deploy -DserviceName=MEMECHIP_${VER} -DappConfig=$OPALCONFIG/meme-chip_config.xml
-     ant -f $OPALXML deploy -DserviceName=MEMECHIP_${VER} -DappConfig=$OPALCONFIG/meme-chip_config.xml
+echo deploy MEMECHIP_${VER}
+cp $OPALCONFIG/meme-chip_config.xml $DEPLOYDIR/MEMECHIP_${VER}.xml
 
-echo ant -f $OPALXML deploy -DserviceName=DREME_${VER} -DappConfig=$OPALCONFIG/dreme_config.xml
-     ant -f $OPALXML deploy -DserviceName=DREME_${VER} -DappConfig=$OPALCONFIG/dreme_config.xml
+echo deploy DREME_${VER}
+cp $OPALCONFIG/dreme_config.xml $DEPLOYDIR/DREME_${VER}.xml
 
-echo ant -f $OPALXML deploy -DserviceName=CENTRIMO_${VER} -DappConfig=$OPALCONFIG/centrimo_config.xml
-     ant -f $OPALXML deploy -DserviceName=CENTRIMO_${VER} -DappConfig=$OPALCONFIG/centrimo_config.xml
+echo deploy CENTRIMO_${VER}
+cp $OPALCONFIG/centrimo_config.xml $DEPLOYDIR/CENTRIMO_${VER}.xml
 
