@@ -30,13 +30,16 @@ version.mk:
 	grep "MEMEPREV" src/version.mk >> version.mk
 	cat version.mk.in >> version.mk
 
-default: 
+
+default: roll
+
+preroll::
 	for i in `ls nodes/*.xml.in`; do \
 	    export o=`echo $$i | sed 's/\.in//'`; \
 	    cp $$i $$o; \
 	    sed -i -e "s/MEMEVER/$(MEMEVER)/g" -e "s/MEMEPREV/$(MEMEPREV)/g" $$o; \
 	done
-	$(MAKE) roll
+
 
 clean::
 	rm -rf extramods _arch bootstrap.py
