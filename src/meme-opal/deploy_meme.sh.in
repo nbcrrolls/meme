@@ -2,7 +2,7 @@
 
 VER=@MEMEVER@
 OPALCONFIG=/opt/meme_@MEMEVER@/etc
-DEPLOYDIR=/opt/tomcat/deployed
+DEPLOYDIR=/opt/opal/deployed
 
 echo deploy FIMO_${VER}
 cp $OPALCONFIG/fimo_config.xml $DEPLOYDIR/FIMO_${VER}.xml

@@ -1,4 +1,4 @@
 RELEASE = 0
 
-PKGROOT	= /opt/tomcat/
+PKGROOT	= /opt/opal/
 NAME   	= meme-opal

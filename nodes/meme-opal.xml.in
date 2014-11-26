@@ -41,8 +41,8 @@ fi
 
 LOGFILE=/tmp/meme-MEMEVER-deploy.log
 
-if [ -f /opt/tomcat/deploy_meme_MEMEVER.sh ]; then
-    /bin/su tomcat -c "/opt/tomcat/deploy_meme_MEMEVER.sh" &gt; $LOGFILE  2&gt;&amp;1
+if [ -f /opt/opal/deploy_meme_MEMEVER.sh ]; then
+    /bin/su tomcat -c "/opt/opal/deploy_meme_MEMEVER.sh" &gt; $LOGFILE  2&gt;&amp;1
 fi
 
 </post>
