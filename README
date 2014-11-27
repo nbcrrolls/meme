@@ -1,0 +1,11 @@
+MEME Roll
+---------
+
+This roll will install MEME on your Rocks cluster.
+It requires the bio roll and the opal roll.
+This roll contains the software used to power 
+http://nbcr-222.ucsd.edu/meme/
+
+The MEME software is http://ebi.edu.au/ftp/software/MEME
+
+
