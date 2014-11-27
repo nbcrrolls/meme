@@ -46,7 +46,7 @@ clean::
 	rm -rf version.mk
 
 cvsclean:: clean
-	for i in `ls nodes/*.xml`; do \
+	for i in `ls nodes/*.in`; do \
 	    export o=`echo $$i | sed 's/\.in//'`; \
 	    rm -rf  $$o; \
 	done
