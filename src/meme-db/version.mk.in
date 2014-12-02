@@ -1,7 +1,8 @@
-RELEASE = 0
+RELEASE         = 0
+NAME            = meme-db
+GOMO            = gomo_databases
+GOMO_VERSION    = 3
+MOTIF           = motif_databases
+MOTIF_VERSION   = 12.2
 
-NAME    	= meme-db
 TARBALL_POSTFIX	= tgz
-GOMO          = gomo_databases
-MOTIF         = motif_databases
-MOTIF_VERSION = 12.1

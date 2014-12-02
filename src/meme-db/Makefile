@@ -32,16 +32,12 @@ include Rules.mk
 version.mk:
 	cat ../version.mk version.mk.in > version.mk
 
-
 build: version.mk 
-	tar xvf $(GOMO).$(TARBALL_POSTFIX)
-	tar xvf $(MOTIF).$(MOTIF_VERSION).$(TARBALL_POSTFIX)
-
 	
 install::
 	mkdir -p $(ROOT)/$(PKGROOT)
-	cp -r $(GOMO) $(ROOT)/$(PKGROOT)
-	cp -r $(MOTIF) $(ROOT)/$(PKGROOT)
+	tar xvf $(GOMO).$(GOMO_VERSION).$(TARBALL_POSTFIX) -C $(ROOT)/$(PKGROOT)
+	tar xvf $(MOTIF).$(MOTIF_VERSION).$(TARBALL_POSTFIX) -C $(ROOT)/$(PKGROOT)
 
 clean::
 	rm -rf version.mk
