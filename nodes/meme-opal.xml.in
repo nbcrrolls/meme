@@ -44,11 +44,23 @@ fi
 <!-- restart httpd -->
 /etc/init.d/httpd restart
 
+
+<file name="/etc/rc.d/rocksconfig.d/post-99-pmemedeploy" perms="0700">
+#!/bin/bash
+#
+
+# need to run after post-99-opaldeploy that's why we called this script
+# post-99-pmemedeploy so it comes after opaldeploy
+
+
 LOGFILE=/tmp/meme-MEMEVER-deploy.log
 
 if [ -f /opt/opal/deploy_meme_MEMEVER.sh ]; then
     /bin/su tomcat -c "/opt/opal/deploy_meme_MEMEVER.sh" &gt; $LOGFILE  2&gt;&amp;1
 fi
+
+rm -f /etc/rc.d/rocksconfig.d/post-99-pmemedeploy
+</file>
 
 </post>
 
