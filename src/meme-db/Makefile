@@ -36,6 +36,7 @@ build: version.mk
 	
 install::
 	mkdir -p $(ROOT)/$(PKGROOT)
+	mkdir -p $(ROOT)/$(PKGROOT)/fasta_databases
 	tar xvf $(GOMO).$(GOMO_VERSION).$(TARBALL_POSTFIX) -C $(ROOT)/$(PKGROOT)
 	tar xvf $(MOTIF).$(MOTIF_VERSION).$(TARBALL_POSTFIX) -C $(ROOT)/$(PKGROOT)
 
