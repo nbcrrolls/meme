@@ -69,12 +69,12 @@
 
 <post>
 
-
 <!-- create needed NFS-shared directories on frontend -->
 if [ -f /opt/meme_MEMEVER/rocks/meme-nfs.sh ] ; then
     /opt/meme_MEMEVER/rocks/meme-nfs.sh
 fi
 
+<!-- automount db and logs -->
 <file name="/etc/auto.share" mode="append">
 meme &Kickstart_PrivateHostname;:/export/&amp;
 </file>
@@ -82,6 +82,9 @@ meme &Kickstart_PrivateHostname;:/export/&amp;
 /etc/init.d/autofs restart
 /opt/rocks/bin/rocks sync users
 /opt/rocks/bin/rocks run host compute "service autofs restart"
+
+<!-- load meme.conf -->
+/etc/init.d/httpd reload
 
 </post>
 

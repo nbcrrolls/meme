@@ -8,6 +8,8 @@ include Rules.mk
 
 PKGROOT = /opt/meme_$(MEMEVER)/rocks
 
+SCRIPTS = meme-logrotate meme-nfs.sh meme-www.sh
+
 SEDSPEC += \
         -e 's%@MEMEVER@%$(MEMEVER)%g' \
         -e 's%@MEMEPREV@%$(MEMEPREV)%g' 
@@ -21,14 +23,18 @@ meme-logrotate:  meme-logrotate.in
 meme-nfs.sh:  meme-nfs.sh.in
 	$(SED) $(SEDSPEC) $^ > $@
 
-build: version.mk meme-logrotate meme-nfs.sh 
+meme-www.sh:  meme-www.sh.in
+	$(SED) $(SEDSPEC) $^ > $@
+
+build: version.mk  $(SCRIPTS)
 
 
 install::
 	mkdir -p $(ROOT)/$(PKGROOT)
 	$(INSTALL) -m644 meme-logrotate $(ROOT)/$(PKGROOT)
 	$(INSTALL) -m755 meme-nfs.sh $(ROOT)/$(PKGROOT)
+	$(INSTALL) -m755 meme-www.sh $(ROOT)/$(PKGROOT)
 
 clean::
 	rm -f $(NAME).spec.in version.mk
-	rm -rf meme-logrotate meme-nfs.sh
+	rm -rf $(SCRIPTS)
