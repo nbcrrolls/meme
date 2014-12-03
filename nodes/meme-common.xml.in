@@ -41,8 +41,9 @@
 	
 	</changelog>
 
-	<package>meme491</package>
-	<package>meme490</package>
+	<package>meme410</package>
+	<package>libxml2</package>
+	<package>libxslt</package>
 	<package>ImageMagick</package>
 	<package>opt-perl-HTML-Template</package>
 
