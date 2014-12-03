@@ -7,6 +7,13 @@
 # Needed during meme build for creating db csv files
 #
 
+.  /opt/rocks/share/devel/src/roll/etc/bootstrap-functions.sh
+
+# crete dirs needed for making links in meme rpm.
+echo "meme `hostname -s`:/export/&" >> /etc/auto.share
+/etc/init.d/autofs restart
+compile_and_install meme-db
+
 IGNORE="--default-ignorelist --ignorelist `pwd`/modules-ignore"
 
 export PATH=/opt/perl/bin:$PATH
