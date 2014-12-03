@@ -1,28 +1,21 @@
 #!/bin/bash
 
-# update cvs files
-UPDATE_CSV=/opt/meme_@MEMEVER@/bin/update-csv.sh
-
-if [ -x $UPDATE_CSV ] ; then
-    $UPDATE_CSV
-fi
-
-# update db per cvs files
-UPDATEDB=/opt/meme_@MEMEVER@/bin/update_db
-LOG=/tmp/meme-update-db.log
-OPTS="-upstream -noclobber"
+# update db 
+UPDATEDB=/opt/meme_@MEMEVER@/bin/update-sequence-db
+FASTADB=/opt/meme_@MEMEVER@/db/fasta_databases
+LOG=/tmp/meme-updatedb.log
 
 # mount nfs partition with fasta databases
-ls /opt/meme_@MEMEVER@/db/fasta_databases/ > /dev/null
+ls $FASTADB  > /dev/null
 
 date > $LOG
 if [ -x $UPDATEDB ] ; then
-    $UPDATEDB $OPTS >> $LOG 2>&1
+    $UPDATEDB >> $LOG 2>&1
 fi
 
 # mail log file
 MSG=/tmp/meme-message
-ATTACH=meme-update-db-`date +%Y-%m-%d`.log.gz
+ATTACH=meme-updatedb-`date +%Y-%m-%d`.log.gz
 TO=meme@nbcr.net
 HOST=`rocks list host attr localhost | grep opal_public_fqdn | awk '{print $3}'`
 

@@ -41,47 +41,22 @@ SEDSPEC += \
         -e 's%@MEMEVER@%$(MEMEVER)%g' \
         -e 's%@MEMEPREV@%$(MEMEPREV)%g' 
 
-SEDSPECPREV += \
-            -e 's%@MEMEVER@%$(MEMEPREV)%g' 
-
 version.mk:
 	cat ../version.mk version.mk.in > version.mk
 
-meme-update-db:  meme-update-db.in
+meme-updatedb:  meme-updatedb.in
 	$(SED) $(SEDSPEC) $^ > $@
 
-meme-jobs-cleanup:  meme-jobs-cleanup.in
-	$(SED) $(SEDSPEC) $^ > $@
-
-deploy_meme_$(MEMEVER).sh: deploy_meme.sh.in
-	$(SED) $(SEDSPEC) $^ > $@
-
-deploy_meme_$(MEMEPREV).sh: deploy_meme.sh.in
-	$(SED) $(SEDSPECPREV) $^ > $@
-
-undeploy_meme_$(MEMEVER).sh: undeploy_meme.sh.in
-	$(SED) $(SEDSPEC) $^ > $@
-
-undeploy_meme_$(MEMEPREV).sh: undeploy_meme.sh.in
-	$(SED) $(SEDSPECPREV) $^ > $@
-
-build:  deploy_meme_$(MEMEVER).sh deploy_meme_$(MEMEPREV).sh \
-	undeploy_meme_$(MEMEVER).sh undeploy_meme_$(MEMEPREV).sh \
-	meme-update-db meme-jobs-cleanup
+build:  meme-updatedb 
 	
 install::
-	mkdir -p $(ROOT)/$(PKGROOT)
-	$(INSTALL)  -m 0755  *deploy_meme_$(MEMEVER).sh  $(ROOT)/$(PKGROOT)
-	$(INSTALL)  -m 0755  *deploy_meme_$(MEMEPREV).sh  $(ROOT)/$(PKGROOT)
 	mkdir -p $(ROOT)/etc/httpd/conf.d
 	install -m 644 meme.conf $(ROOT)/etc/httpd/conf.d
-	#mkdir -p $(ROOT)/var/www/html/downloads
-	#$(INSTALL) -m644 index.html $(ROOT)/var/www/html/downloads
 	mkdir -p $(ROOT)/etc/cron.daily 
 	$(INSTALL) -m755 meme-jobs-cleanup $(ROOT)/etc/cron.daily/
 	mkdir -p $(ROOT)/etc/cron.monthly 
-	$(INSTALL) -m755 meme-update-db $(ROOT)/etc/cron.monthly/
+	$(INSTALL) -m755 meme-updatedb $(ROOT)/etc/cron.monthly/
 
 clean::
-	rm -rf version.mk *deploy_meme_*.sh
-	rm -rf meme-update-db meme-jobs-cleanup 
+	rm -rf version.mk 
+	rm -rf meme-updatedb 
