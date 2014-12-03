@@ -41,8 +41,8 @@ if [ -f /opt/meme_MEMEVER/rocks/meme-www.sh ] ; then
     /opt/meme_MEMEVER/rocks/meme-www.sh
 fi
 
-<!-- restart httpd -->
-/etc/init.d/httpd restart
+<!-- load meme.conf -->
+/etc/init.d/httpd reload
 
 
 <file name="/etc/rc.d/rocksconfig.d/post-99-pmemedeploy" perms="0700">
