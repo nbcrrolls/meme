@@ -24,7 +24,6 @@
 	Revision 1.1  2012/10/24 01:33:54  nadya
 	use version in deploy script
 	
-	
 	</changelog>
 
 	<package>meme-opal</package>
@@ -33,14 +32,7 @@
 	<package>opt-perl-XML-Simple</package>
 	<package>opt-perl-XML-Parser</package>
 
-
 <post>
-
-<!-- create needed website  shortcut links on opal server node -->
-if [ -e /opt/tomcat/webapps/meme ] ; then
-   rm -rf /opt/tomcat/webapps/meme
-fi
-ln -s /opt/tomcat/webapps/meme_MEMEVER /opt/tomcat/webapps/meme
 
 <!-- load meme.conf -->
 /etc/init.d/httpd reload
@@ -52,11 +44,22 @@ ln -s /opt/tomcat/webapps/meme_MEMEVER /opt/tomcat/webapps/meme
 # need to run after post-99-opaldeploy that's why we called this script
 # post-99-pmemedeploy so it comes after opaldeploy
 
-
 LOGFILE=/tmp/meme-MEMEVER-deploy.log
+MEME_WEBSITE=/opt/meme_MEMEVER/build-website
+WEBAPPS=/opt/tomcat/webapps/
 
-if [ -f /opt/opal/deploy_meme_MEMEVER.sh ]; then
-    /bin/su tomcat -c "/opt/opal/deploy_meme_MEMEVER.sh" &gt; $LOGFILE  2&gt;&amp;1
+if [ -f $MEME_WEBSITE/build.xml ]; then
+    (cd $MEME_WEBSITE; /opt/rocks/bin/ant install &gt; $LOGFILE  2&gt;&amp;1)
+    chown tomcat:tomcat /opt/tomcat/lib/*.jar
+fi
+
+# let tomcat use war file
+sleep 5
+ 
+# create needed website shortcut links on opal server node 
+if [ -d /opt/tomcat/webapps/meme_MEMVER ]; then
+   rm -rf /opt/tomcat/webapps/meme
+   ln -s /opt/tomcat/webapps/meme_MEMEVER /opt/tomcat/webapps/meme
 fi
 
 rm -f /etc/rc.d/rocksconfig.d/post-99-pmemedeploy
