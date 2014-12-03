@@ -30,8 +30,6 @@ install::
 	mkdir -p $(ROOT)/$(PKGROOT)
 	$(INSTALL) -m644 meme-logrotate $(ROOT)/$(PKGROOT)
 	$(INSTALL) -m755 meme-nfs.sh $(ROOT)/$(PKGROOT)
-	mkdir -p $(ROOT)/etc/httpd/conf.d
-	$(INSTALL) -m644 meme.conf $(ROOT)/etc/httpd/conf.d
 	
 clean::
 	rm -f $(NAME).spec.in version.mk
