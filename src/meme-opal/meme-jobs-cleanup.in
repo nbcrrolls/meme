@@ -1,33 +1,21 @@
 #!/bin/bash
 
-# number of days to keep old jobs scratch directories
-DAYS=7
+# Remove tomtom temp files from MEME jobs
 
-# tomtom temp files
-DIR=/share/meme/output-@MEMEVER@
-if [ -d $DIR ] ; then
-    files=`find $DIR  -mindepth 1  -type d -mtime +$DAYS -print`
-    for i in $files;
-    do
-        rm -rf $i
-    done
-fi
+clean_temp_files () {
+    DAYS=3  
+    DIR=$1
+    NAME=$2
+    if [ -d $DIR ] ; then
+        files=`find $DIR  -type f -mtime +$DAYS -name '$NAME'  -print`
+        for i in $files;
+        do
+            rm -rf $i
+        done
+    fi
+}
 
-DIR=/share/meme/output-@MEMEPREV@
-if [ -d $DIR ] ; then
-    files=`find $DIR  -mindepth 1  -type d -mtime +$DAYS -print`
-    for i in $files;
-    do
-        rm -rf $i
-    done
-fi
+clean_temp_files /opt/tomcat/temp CGItemp\*
+clean_temp_files /opt/tomcat/temp \*_seq_\* 
+clean_temp_files /opt/tomcat/temp stderr_\* 
 
-# CGI temp files
-if [ -d /var/tmp ] ; then
-    DIR=/var/tmp
-    files=`find $DIR  -type f -mtime +$DAYS -name 'CGItemp*'  -print`
-    for i in $files;
-    do
-        rm -rf $i
-    done
-fi
