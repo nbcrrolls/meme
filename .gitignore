@@ -1,0 +1,34 @@
+# build directory
+FOSSILS/
+RPMS/x86_64
+RPMS/noarch
+SOURCES/
+BUILD/
+SPECS/
+disk1/
+meme-*disk1.iso
+
+_os
+_arch
+_distribution
+.rpmmacros
+bootstrap.py
+
+# ignore version* files
+rocks-version*.mk
+
+# ignore python files
+python.mk
+*.pyc
+
+# ignore Rules* files
+Rules*.mk
+Rolls.mk
+
+# ignore roll files 
+roll*.mk
+roll-*
+
+# ignore src files
+src/meme491
+src/meme490
