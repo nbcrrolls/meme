@@ -5,24 +5,16 @@
 <title>What is installed on a frontend</title>
 <itemizedlist>
 <listitem> <para>/opt/meme_@MEMEVER@ (meme suit) </para></listitem>
-<listitem> <para>/opt/meme_@MEMEPREV@ (meme suit previous version) </para></listitem>
 <listitem> <para>/opt/meme -> /opt/meme_@MEMEVER@ </para></listitem>
-<listitem> <para>/opt/meme_@MEMEVER@/bin/update-csv.sh (script to update db csv files) </para></listitem>
-<listitem> <para>/var/www/html/meme -> /opt/meme_@MEMEVER@/web (link to cgi web interface)</para></listitem>
-<listitem> <para>/var/www/html/meme_@MEMEVER@ -> /opt/meme_@MEMEVER@/web (link to cgi web interface)</para></listitem>
-<listitem> <para>/var/www/html/meme_@MEMEPREV@ -> /opt/meme_@MEMEPREV@/web (link to cgi web interface)</para></listitem>
-<listitem> <para>/var/www/html/roll-documentation/meme (roll docs) </para></listitem>
+<listitem> <para>/opt/tomcat/webapps/meme_@MEMVER@ (website)</para></listitem>
+<listitem> <para>/var/www/html/roll-documentation/meme (this roll docs) </para></listitem>
 <listitem> <para>/etc/cron.daily/meme-job-cleanup-@MEMEVER@ (cron job to clean old job dirs) </para></listitem>
-<listitem> <para>/etc/cron.daily/meme-job-cleanup-@MEMEPREV@ (cron job to clean old job dirs) </para></listitem>
-<listitem> <para>/etc/cron.monthly/meme-update-db-@MEMEVER@ (cron job to update db) </para></listitem>
-<listitem> <para>/etc/cron.monthly/meme-update-db-@MEMEPREV@ (cron job to update db) </para></listitem>
+<listitem> <para>/etc/cron.monthly/meme-updatedb (cron job to update db) </para></listitem>
+<listitem> <para>/etc/httpd/conf.d/meme.conf (apache configuration) </para></listitem>
 <listitem> <para>/share/meme/db (gomo, motif and fasta dbs) </para></listitem>
-<listitem> <para>/share/meme/output (for tomtom jobs temp files) </para></listitem>
-<listitem> <para>/share/meme/user-files (for CGI jtemp files) </para></listitem>
-<listitem> <para>/opt/meme_@MEMEVER@/web/output --> /share/meme/output-@MEMEVER@ </para></listitem>
-<listitem> <para>/opt/meme_@MEMEPREV@/web/output --> /share/meme/output-@MEMEVER@ </para></listitem>
-<listitem> <para>/opt/meme_@MEMEVER@/web/user-files --> /share/meme/user-files-@MEMEVER@ </para></listitem>
-<listitem> <para>/opt/meme_@MEMEPREV@/web/user-files --> /share/meme/user-files-@MEMEVER@ </para></listitem>
+<listitem> <para>/share/meme/LOGS-@MEMEVER@ (for logs) </para></listitem>
+<listitem> <para>/opt/meme_@MEMEVER@/rocks/meme-logrotate (log rotation script) </para></listitem>
+<listitem> <para>/opt/meme_@MEMEVER@/rocks/meme-nfs.sh  (script tpo create NFS-mounted dirs) </para></listitem>
 <listitem> <para>/opt/perl/lib/site_perl/5.14.2/Class/Std </para></listitem>
 <listitem> <para>/opt/perl/lib/site_perl/5.14.2/Class/Std/Fast </para></listitem>
 <listitem> <para>/opt/perl/lib/site_perl/5.14.2/SOAP/WSDL </para></listitem>
@@ -36,7 +28,6 @@
 <title>What is installed on compute nodes</title>
 <itemizedlist>
 <listitem> <para>/opt/meme_@MEMEVER@ (meme suit) </para></listitem>
-<listitem> <para>/opt/meme_@MEMEPREV@ (meme suit) </para></listitem>
 <listitem> <para>/opt/meme -> /opt/meme_@MEMEVER@ </para></listitem>
 <listitem> <para>/opt/perl/lib/site_perl/5.14.2/HTML/Template </para></listitem>
 </itemizedlist>
@@ -63,16 +54,16 @@ The databases need to be available on all compute nodes, so /data/meme/fasta_dat
 need to be available (automount) on all compute nodes. Please update automount maps accordingly
 </para>
 <para>
-Monthly cron job /etc/cron.monthly/meme-update-db-(version) takes care of updating csv files and
+Monthly cron job /etc/cron.monthly/meme-updatedb takes care of updating and
 uploading the fasta databases.  After installing the roll run this command directly to
 upload the databases first time:
 </para>
 <itemizedlist>
-<listitem> <para>/etc/cron.monthly/meme-update-db </para></listitem>
+<listitem> <para>/etc/cron.monthly/meme-updatedb </para></listitem>
 </itemizedlist>
 <para>
 It can take time to download all the sequence databases, and the connections to some sites from which 
-files are downloaded may be not always available. Check the output of the script (/tmp/meme-update-db.log) for error messages. 
+files are downloaded may be not always available. Check the output of the script (/tmp/meme-updatedb.log) for error messages. 
 If there are errors, the command to install the fasta sequence databases will need to be repeated.
 </para>
 </simplesect>

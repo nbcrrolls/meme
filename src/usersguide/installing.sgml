@@ -18,11 +18,10 @@ If your network server does not have this roll added, the roll can be added from
 <para>
 The MEME roll may also be added to an existing server (or frontend). For sake of discussion, 
 assume that you have an iso image of the roll called meme-&document-version;.iso. 
-The following procedure will install the roll, and deploy the webservice. 
+The following commands (run as root) will install the roll, and deploy the webservice. 
 </para>
 
 <screen>
-$ su - root
 # rocks add roll meme-&document-version;.iso
 # rocks enable roll meme
 # cd /export/rocks/install; rocks create distro
@@ -38,7 +37,7 @@ To add the the MEME roll to the nodes of your cluster, you'll need to reinstall 
 To reinstall all your nodes, as root execute:
 <screen>
 # rocks set host compute boot action=install
-# rocks run host compute command=reboot
+# rocks run host compute reboot
 </screen>
 
 </para>
