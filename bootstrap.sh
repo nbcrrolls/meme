@@ -9,11 +9,6 @@
 
 .  /opt/rocks/share/devel/src/roll/etc/bootstrap-functions.sh
 
-# crete dirs needed for making links in meme rpm.
-echo "meme `hostname -s`:/export/&" >> /etc/auto.share
-/etc/init.d/autofs restart
-compile_and_install meme-db
-
 IGNORE="--default-ignorelist --ignorelist `pwd`/modules-ignore"
 
 export PATH=/opt/perl/bin:$PATH
@@ -24,6 +19,14 @@ if [ ! -d $EXTRA ] ; then
    mkdir $EXTRA
 fi
 cd $EXTRA
+
+doDBs () {
+cd $DIR
+# create dirs needed for making links in meme rpm.
+echo "meme `hostname -s`:/export/&" >> /etc/auto.share
+/etc/init.d/autofs restart
+compile_and_install meme-db
+}
 
 doClassStd () {
 /opt/perl/bin/cpan2dist  --force --format CPANPLUS::Dist::Rocks $IGNORE  Class::Std
@@ -74,4 +77,6 @@ doTimeDate
 doSoapWsdl
 doHTMLTemplate
 doFTPAutoReconnect
+
+doDBs
 
