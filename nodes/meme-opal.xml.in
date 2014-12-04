@@ -57,7 +57,7 @@ fi
 sleep 5
  
 # create needed website shortcut links on opal server node 
-if [ -d /opt/tomcat/webapps/meme_MEMVER ]; then
+if [ -d /opt/tomcat/webapps/meme_MEMEVER ]; then
    rm -rf /opt/tomcat/webapps/meme
    ln -s /opt/tomcat/webapps/meme_MEMEVER /opt/tomcat/webapps/meme
 fi
