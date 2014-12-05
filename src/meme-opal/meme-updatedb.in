@@ -5,12 +5,20 @@ UPDATEDB=/opt/meme_@MEMEVER@/bin/update-sequence-db
 FASTADB=/opt/meme_@MEMEVER@/db/fasta_databases
 LOG=/tmp/meme-updatedb.log
 
-# mount nfs partition with fasta databases
-ls $FASTADB  > /dev/null
-
 date > $LOG
+
+# mount nfs partition with fasta databases
+if [ -d $FASTADB ] ; then
+    ls $FASTADB/conf > /dev/null
+else
+    echo "ERROR: missing $FASTADB " >> $LOG
+fi
+
+# run update db script 
 if [ -x $UPDATEDB ] ; then
-    $UPDATEDB >> $LOG 2>&1
+    $UPDATEDB $FASTADB >> $LOG 2>&1
+else 
+    echo "ERROR: missing $UPDATEDB " >> $LOG
 fi
 
 # mail log file
