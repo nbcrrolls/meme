@@ -45,6 +45,7 @@
 	<package>libxml2</package>
 	<package>libxslt</package>
 	<package>ImageMagick</package>
+	<package>libtool-ltdl</package>
 	<package>opt-perl-HTML-Template</package>
 
 <post>
