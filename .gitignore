@@ -30,5 +30,6 @@ roll*.mk
 roll-*
 
 # ignore src files
-src/meme491
-src/meme490
+src/meme491/*
+src/meme490/*
+src/RPMS/opt-perl*rpm
