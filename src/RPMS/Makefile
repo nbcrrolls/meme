@@ -20,12 +20,7 @@ include Rules.mk
 NOARCH = noarch
 
 rpm:: build
-	-cp $(CLASS_STD)-*.$(NOARCH).rpm $(REDHAT.RPMS)/$(NOARCH)/
-	-cp $(CLASS_STD_FAST)-*.$(NOARCH).rpm $(REDHAT.RPMS)/$(NOARCH)/
-	-cp $(SOAP_WSDL)-*.$(NOARCH).rpm $(REDHAT.RPMS)/$(NOARCH)/
-	-cp $(TimeDate)-*.$(NOARCH).rpm $(REDHAT.RPMS)/$(NOARCH)/
 	-cp $(HTML_Template)-*.$(NOARCH).rpm $(REDHAT.RPMS)/$(NOARCH)/
-	-cp $(Net_FTP)-*.$(NOARCH).rpm $(REDHAT.RPMS)/$(NOARCH)/
 
 build:
 	mkdir -p $(REDHAT.RPMS)/$(NOARCH)/
