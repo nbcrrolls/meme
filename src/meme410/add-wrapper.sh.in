@@ -1,0 +1,16 @@
+#!/bin/bash
+
+names="ame centrimo dreme fimo glam2 glam2scan gomo mast mcast meme meme-chip spamo tomtom"
+
+for i in $names; do
+	servicename=${i}_webservice
+        wrapper=$servicename.wrap
+        echo "#!/bin/bash" > $wrapper
+        echo >> $wrapper
+        echo ". /etc/profile.d/modules.sh" >> $wrapper
+        echo "module load rocks-openmpi" >> $wrapper
+        echo "module load opt-python" >> $wrapper
+        echo >> $wrapper
+        echo "/opt/meme_@MEMEVER@/bin/$servicename  \$@" >> $wrapper
+done
+
