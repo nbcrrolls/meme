@@ -14,7 +14,7 @@
 <listitem> <para>/share/meme/db (gomo, motif and fasta dbs) </para></listitem>
 <listitem> <para>/share/meme/LOGS-@MEMEVER@ (for logs) </para></listitem>
 <listitem> <para>/opt/meme_@MEMEVER@/rocks/meme-logrotate (log rotation script) </para></listitem>
-<listitem> <para>/opt/meme_@MEMEVER@/rocks/meme-nfs.sh  (script tpo create NFS-mounted dirs) </para></listitem>
+<listitem> <para>/opt/meme_@MEMEVER@/rocks/meme-nfs.sh  (script to create NFS-mounted dirs) </para></listitem>
 <listitem> <para>/opt/perl/lib/site_perl/5.14.2/Class/Std </para></listitem>
 <listitem> <para>/opt/perl/lib/site_perl/5.14.2/Class/Std/Fast </para></listitem>
 <listitem> <para>/opt/perl/lib/site_perl/5.14.2/SOAP/WSDL </para></listitem>
