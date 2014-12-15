@@ -2,6 +2,7 @@ RELEASE = 0
 
 PKGNAME    	= meme
 NAME    	= meme410
+MEMEPATCH       = _3
 TARBALL_POSTFIX	= tar.gz
 
 #RPM.EXTRAS="%define __os_install_post /usr/lib/rpm/brp-compress"

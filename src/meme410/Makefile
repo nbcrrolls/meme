@@ -70,7 +70,7 @@ add-wrapper.sh: add-wrapper.sh.in
 	chmod 755 $@
 
 build: version.mk $(SCRIPTS)
-	gunzip -c $(PKGNAME)_$(MEMEVER).$(TARBALL_POSTFIX) | $(TAR) -xf -
+	gunzip -c $(PKGNAME)_$(MEMEVER)$(MEMEPATCH).$(TARBALL_POSTFIX) | $(TAR) -xf -
 	#cd patch-files && find . -type f | grep -v CVS | cpio -pduv ..
 	( 							      \
 		cd $(PKGNAME)_$(MEMEVER);			      \
@@ -82,7 +82,7 @@ build: version.mk $(SCRIPTS)
 			--with-python=/opt/python/bin/python2.7       \
 			--with-perl=/opt/perl/bin/perl                \
 			--with-contact=meme@nbcr.net                  \
-			--with-url=http://rollhost/meme_$(MEMEVER)    \
+			--with-url=http://meme.ebi.edu.au/meme/       \
 			--enable-web=http://rollhost/opal2/services   \
 			--enable-webservice=/opt/opal/deployed;       \
 		$(MAKE);					      \
