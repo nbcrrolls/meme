@@ -84,7 +84,9 @@ meme-www.sh: meme-www.sh.in
 	$(SED) $(SEDSPEC) $^ > $@
 	chmod 755 $@
 
-build: version.mk update-csv.sh update-csv-bootstrap.sh meme-www.sh
+build: version.mk 
+
+build-old: version.mk update-csv.sh update-csv-bootstrap.sh meme-www.sh
 	gunzip -c $(PKGNAME)_$(MEMEVER).$(TARBALL_POSTFIX) | $(TAR) -xf -
 
 	(							      \
@@ -120,7 +122,11 @@ build: version.mk update-csv.sh update-csv-bootstrap.sh meme-www.sh
 	./update-csv-bootstrap.sh
 
 	
+rpm::
 install::
+
+
+install-old::
 	mkdir -p $(ROOT)/$(PKGROOT)
 	(							\
 		cd $(PKGNAME)_$(MEMEVER);				\

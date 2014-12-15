@@ -90,7 +90,8 @@ meme-www.sh: meme-www.sh.in
 	$(SED) $(SEDSPEC) $^ > $@
 	chmod 755 $@
 
-build: version.mk $(SCRIPTS)
+build: version.mk
+build-old: version.mk $(SCRIPTS)
 	gunzip -c $(PKGNAME)_$(MEMEVER).$(TARBALL_POSTFIX) | $(TAR) -xf -
 
 	(							      \
@@ -127,6 +128,9 @@ build: version.mk $(SCRIPTS)
 
 	
 install::
+rpm::
+
+install-old::
 	mkdir -p $(ROOT)/$(PKGROOT)
 	(							\
 		cd $(PKGNAME)_$(MEMEVER);				\
