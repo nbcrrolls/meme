@@ -9,3 +9,11 @@ http://nbcr-222.ucsd.edu/meme/
 The MEME software is http://ebi.edu.au/ftp/software/MEME
 
 
+For meme 4.10.0 requests to *_request.cgi are not passed by tomcat. 
+None of the httpd/tomct configs worked. 
+For a workaround send all cgi requests to AU server. Run config/build
+for meme410 as 
+                        --with-url=http://meme.ebi.edu.au/meme/
+in place of
+                        --with-url=http://rollhost/meme_$(MEMEVER) 
+
