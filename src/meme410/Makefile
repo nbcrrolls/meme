@@ -71,7 +71,7 @@ add-wrapper.sh: add-wrapper.sh.in
 
 build: version.mk $(SCRIPTS)
 	gunzip -c $(PKGNAME)_$(MEMEVER)$(MEMEPATCH).$(TARBALL_POSTFIX) | $(TAR) -xf -
-	#cd patch-files && find . -type f | grep -v CVS | cpio -pduv ..
+	cd patch-files && find . -type f | grep -v CVS | cpio -pduv ..
 	( 							      \
 		cd $(PKGNAME)_$(MEMEVER);			      \
 		export CATALINA_HOME=/opt/tomcat;		      \
@@ -103,7 +103,7 @@ install::
 	)
 	./add-wrapper.sh
 	mkdir -p $(ROOT)/$(PKGROOT)/bin
-	$(INSTALL) -m755 $(WEBSERVICE_WRAPPERS)  $(ROOT)/$(PKGROOT)/bin
+	$(INSTALL) -m755 $(WEBSERVICE_WRAPPERS) $(ROOT)/$(PKGROOT)/bin
 	mkdir -p /state/partition1/meme/LOGS-$(MEMEVER)
 	ls /share/meme 
 	mkdir -p $(ROOT)/$(PKGROOT)/db
