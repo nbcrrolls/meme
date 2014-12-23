@@ -6,6 +6,8 @@
 <itemizedlist>
 <listitem> <para>/opt/meme_@MEMEVER@ (meme suit) </para></listitem>
 <listitem> <para>/opt/meme -> /opt/meme_@MEMEVER@ </para></listitem>
+<listitem> <para>/opt/meme_@MEMEVER@/rocks/meme-logrotate (log rotation script) </para></listitem>
+<listitem> <para>/opt/meme_@MEMEVER@/rocks/meme-nfs.sh (script to create NFS-mounted dirs) </para></listitem>
 <listitem> <para>/opt/tomcat/webapps/meme_@MEMVER@ (website)</para></listitem>
 <listitem> <para>/var/www/html/roll-documentation/meme (this roll docs) </para></listitem>
 <listitem> <para>/etc/cron.daily/meme-job-cleanup-@MEMEVER@ (cron job to clean old job dirs) </para></listitem>
@@ -13,14 +15,7 @@
 <listitem> <para>/etc/httpd/conf.d/meme.conf (apache configuration) </para></listitem>
 <listitem> <para>/share/meme/db (gomo, motif and fasta dbs) </para></listitem>
 <listitem> <para>/share/meme/LOGS-@MEMEVER@ (for logs) </para></listitem>
-<listitem> <para>/opt/meme_@MEMEVER@/rocks/meme-logrotate (log rotation script) </para></listitem>
-<listitem> <para>/opt/meme_@MEMEVER@/rocks/meme-nfs.sh  (script to create NFS-mounted dirs) </para></listitem>
-<listitem> <para>/opt/perl/lib/site_perl/5.14.2/Class/Std </para></listitem>
-<listitem> <para>/opt/perl/lib/site_perl/5.14.2/Class/Std/Fast </para></listitem>
-<listitem> <para>/opt/perl/lib/site_perl/5.14.2/SOAP/WSDL </para></listitem>
-<listitem> <para>/opt/perl/lib/site_perl/5.14.2/Date </para></listitem>
-<listitem> <para>/opt/perl/lib/site_perl/5.14.2/Time </para></listitem>
-<listitem> <para>/opt/perl/lib/site_perl/5.14.2/HTML/Template </para></listitem>
+<listitem> <para>Perl modules SOAP-Lite, Class-Inspector,XML-Simple, XML-Parser, HTML-Template in /opt/perl</para></listitem>
 </itemizedlist>
 </simplesect>
 
@@ -29,7 +24,7 @@
 <itemizedlist>
 <listitem> <para>/opt/meme_@MEMEVER@ (meme suit) </para></listitem>
 <listitem> <para>/opt/meme -> /opt/meme_@MEMEVER@ </para></listitem>
-<listitem> <para>/opt/perl/lib/site_perl/5.14.2/HTML/Template </para></listitem>
+<listitem> <para>Perl module HTML-Template in /opt/perl</para></listitem>
 </itemizedlist>
 </simplesect>
 
