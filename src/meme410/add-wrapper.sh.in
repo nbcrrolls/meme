@@ -1,5 +1,12 @@
 #!/bin/bash
 
+# Create simple script wrapper for each meme toll webservice
+# The script loads modules to find needed by the tools mpi and python libraries.
+# then calls an actula webservice script. The wrapper is specified in <binaryLocation>
+# tags in the opal deployment files. 
+# This is a workaround if the DRMAA job manager in opal is not patched. 
+# The patched DRMAA uses native spec to import environment.
+
 names="ame centrimo dreme fimo glam2 glam2scan gomo mast mcast meme meme-chip spamo tomtom"
 
 for i in $names; do
