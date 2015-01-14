@@ -5,7 +5,12 @@ UPDATEDB=/opt/meme_@MEMEVER@/bin/update-sequence-db
 FASTADB=/opt/meme_@MEMEVER@/db/fasta_databases
 LOG=/tmp/meme-updatedb.log
 
-date > $LOG
+# start log file
+/bin/date > $LOG
+
+# set environment for a cron job
+.  /etc/profile.d/java.sh 
+.  /etc/profile.d/rocks-binaries.sh 
 
 # mount nfs partition with fasta databases
 if [ -d $FASTADB ] ; then
