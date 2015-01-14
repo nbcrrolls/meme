@@ -44,6 +44,8 @@
 # need to run after post-99-opaldeploy that's why we called this script
 # post-99-pmemedeploy so it comes after opaldeploy
 
+. /etc/profile.d/java.sh
+
 LOGFILE=/tmp/meme-MEMEVER-deploy.log
 MEME_WEBSITE=/opt/meme_MEMEVER/build-website
 WEBAPPS=/opt/tomcat/webapps/
@@ -54,10 +56,10 @@ if [ -f $MEME_WEBSITE/build.xml ]; then
 fi
 
 # let tomcat use war file
-sleep 5
+sleep 15
  
 # create needed website shortcut links on opal server node 
-if [ -d /opt/tomcat/webapps/meme_MEMEVER ]; then
+if [ -f /opt/tomcat/webapps/meme_MEMEVER.war ]; then
    rm -rf /opt/tomcat/webapps/meme
    ln -s /opt/tomcat/webapps/meme_MEMEVER /opt/tomcat/webapps/meme
 fi
