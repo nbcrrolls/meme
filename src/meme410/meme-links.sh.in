@@ -1,0 +1,8 @@
+#!/bin/bash
+
+BASEDIR=/share/meme
+PKGROOT_LOGS=/opt/meme_@MEMEVER@/LOGS
+
+rm -rf $PKGROOT_LOGS
+ln -s $BASEDIR/LOGS-@MEMEVER@ $PKGROOT_LOGS
+

@@ -73,6 +73,8 @@ for i in $change_list; do \
     sed -i "s/$tempname/$SERVER_NAME/g" $i; \
 done
 
+/opt/meme/bin/meme-links.sh
+
 </post>
 
 </kickstart>

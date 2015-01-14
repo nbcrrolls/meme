@@ -62,10 +62,15 @@ version.mk:
 SEDSPEC += \
         -e 's%@MEMEVER@%$(MEMEVER)%g' 
 
-SCRIPTS = add-wrapper.sh
+SCRIPTS = add-wrapper.sh meme-links.sh
+
 WEBSERVICE_WRAPPERS = *_webservice.wrap
 
 add-wrapper.sh: add-wrapper.sh.in
+	$(SED) $(SEDSPEC) $^ > $@
+	chmod 755 $@
+
+meme-links.sh: meme-links.sh.in
 	$(SED) $(SEDSPEC) $^ > $@
 	chmod 755 $@
 
@@ -104,14 +109,15 @@ install::
 	./add-wrapper.sh
 	mkdir -p $(ROOT)/$(PKGROOT)/bin
 	$(INSTALL) -m755 $(WEBSERVICE_WRAPPERS) $(ROOT)/$(PKGROOT)/bin
+	$(INSTALL) -m755 meme-links.sh  $(ROOT)/$(PKGROOT)/bin
 	mkdir -p /state/partition1/meme/LOGS-$(MEMEVER)
 	ls /share/meme 
 	mkdir -p $(ROOT)/$(PKGROOT)/db
 	ln -s /share/meme/db/motif_databases $(ROOT)/$(PKGROOT)/db/motif_databases
 	ln -s /share/meme/db/gomo_databases $(ROOT)/$(PKGROOT)/db/gomo_databases
 	ln -s /share/meme/db/fasta_databases $(ROOT)/$(PKGROOT)/db/fasta_databases
-	rm -rf $(ROOT)/$(PKGROOT)/LOGS
-	ln -s /share/meme/$(PKGROOT_LOGS) $(ROOT)/$(PKGROOT)/LOGS
+	#rm -rf $(ROOT)/$(PKGROOT)/LOGS
+	#ln -s /share/meme/$(PKGROOT_LOGS) $(ROOT)/$(PKGROOT)/LOGS
 
 clean::
 	rm -rf version.mk 
