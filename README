@@ -11,6 +11,9 @@ The MEME software is http://ebi.edu.au/ftp/software/MEME
 For meme 4.10.0 requests to *_request.cgi are not passed to tomcat.
 None of the httpd/tomct configs worked. 
 
-AU team finalyl released  an official patch 3 Jan 6 2015 
+AU team finally released  an official patch 3 Jan 6 2015 
 which updates web.xml to create new servlet-mappings 
 
+Rewrite meme-nbcr.conf and add to /etc/http/conf.d/ during roll install.
+This provides for accessing meme via meme.nbcr.net and meme.sdsc.edu aliases.
+Will need to remove meme-nbcr.conf  when  meme server goes away. 
