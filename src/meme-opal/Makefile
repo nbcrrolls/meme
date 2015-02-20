@@ -52,6 +52,7 @@ build:  meme-updatedb
 install::
 	mkdir -p $(ROOT)/etc/httpd/conf.d
 	install -m 644 meme.conf $(ROOT)/etc/httpd/conf.d
+	install -m 644 meme-nbcr.conf $(ROOT)/etc/httpd/conf.d
 	mkdir -p $(ROOT)/etc/cron.daily 
 	$(INSTALL) -m755 meme-jobs-cleanup $(ROOT)/etc/cron.daily/
 	mkdir -p $(ROOT)/etc/cron.monthly 
